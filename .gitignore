@@ -127,3 +127,14 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# other
+.comet.config
+lightning_logs/
+/_*/
+/results/
+output/
+preprocessed_data/*/
+*.npy
+*.csv
+*.swp
