@@ -3,7 +3,7 @@ import numpy as np
 import json
 
 
-DEBUG = True
+DEBUG = False
 DATAPARSERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -33,8 +33,8 @@ def merge_stats(stats_dict, keys):
 USE_COMET = True
 EXP_IDX = 0
 UPSTREAM = "mel"
-UPSTREAM_DIM = 1024
-LAYER_IDX = 8
+UPSTREAM_DIM = 80
+LAYER_IDX = None
 UPSTREAM_LAYER = 0
 
 if UPSTREAM == "mel":

@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
+import Define
 from transformer import Decoder, PostNet, Encoder2
 from .modules import VarianceAdaptor
 from .speaker_encoder import SpeakerEncoder
@@ -57,6 +58,9 @@ class FastSpeech2(pl.LightningModule):
             else None
         )
 
+        if Define.DEBUG:
+            print("FastSpeech2m input shape: ", texts.shape)
+            print("FastSpeech2m mask shape: ", src_masks.shape)
         output = self.encoder(texts, src_masks)
 
         if self.speaker_emb is not None:

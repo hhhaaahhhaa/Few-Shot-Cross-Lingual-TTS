@@ -26,6 +26,8 @@ if quiet:
     import logging
     # configure logging at the root level of lightning
     logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
+if Define.DEBUG:
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 
 TRAINER_CONFIG = {
@@ -70,7 +72,6 @@ def main(args, configs):
     Define.ALLSTATS["global"] = Define.merge_stats(Define.ALLSTATS, keys)
     if Define.DEBUG:
         print("Initialize data parsers and build normalize stats, done.")
-        print(Define.ALLSTATS)
     #==========================================================
 
     for p in train_config["path"].values():
@@ -163,6 +164,8 @@ def main(args, configs):
             )
 
         # Train
+        if Define.DEBUG:
+            print("Start Training!")
         if Define.USE_COMET:
             trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
             pl.seed_everything(43, True)
@@ -262,8 +265,8 @@ if __name__ == "__main__":
         default=0,
     )
     parser.add_argument(
-        "-le", "--layer_exp", type=int, help="1-24",
-        default=24,
+        "-le", "--layer_exp", help="1-24",
+        default=None,
     )
     parser.add_argument(
         "-ue", "--upstream_exp", type=str, help="upstream options",

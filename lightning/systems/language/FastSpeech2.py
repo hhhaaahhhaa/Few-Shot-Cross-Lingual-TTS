@@ -5,7 +5,7 @@ from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
-from lightning.callbacks.baseline_saver import Saver
+from lightning.callbacks.language.baseline_saver import Saver
 
 
 class BaselineSystem(System):

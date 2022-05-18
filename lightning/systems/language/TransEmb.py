@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -7,10 +8,11 @@ from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
-from lightning.callbacks.baseline_saver import Saver
+from lightning.callbacks.language.fscl_saver import Saver
 from Objects.visualization import CodebookAnalyzer
 from lightning.model.reference_extractor import HubertExtractor, XLSR53Extractor, Wav2Vec2Extractor, MelExtractor
 import Define
+from transformer import Constants
 
 
 class TransEmbSystem(AdaptorSystem):
@@ -50,7 +52,6 @@ class TransEmbSystem(AdaptorSystem):
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
-        saver.set_meta_saver()
         return saver
     
     def init_codebook_type(self):        
@@ -66,7 +67,9 @@ class TransEmbSystem(AdaptorSystem):
     def build_embedding_table(self, batch):
         _, _, ref_phn_feats, lang_id = batch[0]
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
+            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
+            ref_phn_feats = ref_phn_feats.squeeze(0)
+            ref_phn_feats[Constants.PAD].fill_(0)
 
         embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
         return embedding
@@ -77,7 +80,7 @@ class TransEmbSystem(AdaptorSystem):
         qry_batch = qry_batch[0]
         emb_texts = F.embedding(qry_batch[3], emb_table, padding_idx=0)
         output = self.model(qry_batch[2], emb_texts, *(qry_batch[4:]))
-        loss = self.loss_func(batch, output)
+        loss = self.loss_func(qry_batch, output)
         return loss, output
 
     def training_step(self, batch, batch_idx):
@@ -104,6 +107,8 @@ class TransEmbSystem(AdaptorSystem):
             _, _, ref_phn_feats, lang_id = batch[0]
             with torch.no_grad():
                 ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
+                ref_phn_feats = ref_phn_feats.squeeze(0)
+                ref_phn_feats[Constants.PAD].fill_(0)
 
             matching = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
             self.codebook_analyzer.visualize_matching(batch_idx, matching)
@@ -114,11 +119,14 @@ class TransEmbSystem(AdaptorSystem):
         _, _, ref_phn_feats, lang_id = batch[0]
         with torch.no_grad():
             ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
+            ref_phn_feats = ref_phn_feats.squeeze(0)
+            ref_phn_feats[Constants.PAD].fill_(0)
+        
         matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
         for matching in matchings:
             fig = self.codebook_analyzer.plot_matching(matching, quantized=False)
             figure_name = f"{stage}/step_{step}_{batch_idx:03d}_{matching['title']}"
-            self.logger[0].experiment.log_figure(
+            self.logger.experiment.log_figure(
                 figure_name=figure_name,
                 figure=fig,
                 step=step,

@@ -18,7 +18,7 @@ from . import language
 
 DATA_MODULE = {
     "fscl": language.FSCLDataModule,
-    "fscl-tune": language.FSCLDataModule,
+    "fscl-tune": language.FastSpeech2DataModule,
     "semi-fscl": language.SemiFSCLDataModule,
     "multilingual-baseline": language.FastSpeech2DataModule,
     "multilingual-baseline-tune": language.FastSpeech2DataModule,

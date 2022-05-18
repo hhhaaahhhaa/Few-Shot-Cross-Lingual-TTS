@@ -83,7 +83,7 @@ class FSCLDataset(Dataset):
         # For codebook module
         segment = self.data_parser.mfa_segment.read_from_query(query)
         if Define.UPSTREAM == "mel":
-            raw_feat = self.data_parser.mel.read_from_query(query)
+            raw_feat = mel
             avg_frames = self.data_parser.mfa_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
@@ -177,7 +177,7 @@ class UnsupFSCLDataset(Dataset):
         # For codebook module
         segment = self.data_parser.unsup_segment.read_from_query(query)
         if Define.UPSTREAM == "mel":
-            raw_feat = self.data_parser.mel.read_from_query(query)
+            raw_feat = mel
             avg_frames = self.data_parser.unsup_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)

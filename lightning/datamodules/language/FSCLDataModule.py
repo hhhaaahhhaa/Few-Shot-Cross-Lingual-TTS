@@ -101,7 +101,7 @@ class FSCLDataModule(pl.LightningDataModule):
             self.train_task_dataset,
             batch_size=1,
             shuffle=True,
-            num_workers=4,
+            num_workers=0,
             collate_fn=lambda batch: batch,
         )
         return self.train_loader
@@ -190,7 +190,7 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=True,
             drop_last=True,
-            num_workers=4,
+            num_workers=0,
             collate_fn=self.collate.collate_fn(False),
         )
         return self.train_loader
@@ -215,9 +215,9 @@ class SemiFSCLDataModule(pl.LightningDataModule):
     """
     def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
-        self.sup_datamodule = FSCLDataModule(data_configs["sup"], 
+        self.sup_datamodule = FSCLDataModule(data_configs, 
                                                 train_config, algorithm_config, log_dir, result_dir)
-        self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
+        self.unsup_datamodule = UnsupFSCLDataModule(data_configs, 
                                                 train_config, algorithm_config, log_dir, result_dir)
 
     def setup(self, stage=None):
@@ -226,12 +226,13 @@ class SemiFSCLDataModule(pl.LightningDataModule):
 
     def train_dataloader(self):
         return {
-            "sup": self.sup_datamodule.train_loader(),
-            "unsup": self.unsup_datamodule.train_loader()
+            "sup": self.sup_datamodule.train_dataloader(),
+            "unsup": self.unsup_datamodule.train_dataloader()
         }
 
     def val_dataloader(self):
-        return {
-            "sup": self.sup_datamodule.val_loader(),
-            "unsup": self.unsup_datamodule.val_loader()
-        }
+        # Validation loaders are sequentially combined.
+        return [
+            self.sup_datamodule.val_dataloader(),
+            self.unsup_datamodule.val_dataloader()
+        ]

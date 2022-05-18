@@ -2,7 +2,7 @@
 COMET_CONFIG = {
     "api_key": "EuKsVWhTw10JQZ6ahNeQHAm3G",
     "workspace": "jcping",
-    "project_name": "metatts",
+    "project_name": "fscl",
     "log_code": True,
     "log_graph": True,
     "parse_args": True,

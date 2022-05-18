@@ -23,6 +23,8 @@ def reprocess(data, idxs):
 
     if not unsup:
         text_lens = np.array([text.shape[0] for text in texts])
+    else:  # Duration has same length with text, which is equal to the number of segments.
+        text_lens = np.array([len(duration) for duration in durations])
     mel_lens = np.array([mel.shape[0] for mel in mels])
 
     speakers = np.array(speakers)
@@ -73,8 +75,8 @@ def reprocess(data, idxs):
             None,
             speaker_args,
             None,
-            None,
-            None,
+            torch.from_numpy(text_lens),
+            max(text_lens),
             torch.from_numpy(mels).float(),
             torch.from_numpy(mel_lens),
             max(mel_lens),

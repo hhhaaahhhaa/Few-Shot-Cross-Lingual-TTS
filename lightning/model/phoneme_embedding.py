@@ -537,13 +537,14 @@ class SoftMultiAttCodebook(pl.LightningModule):
         self.emb_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
 
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            self.weight_raw = nn.Parameter(torch.zeros(1, 25, 1))
+            self.weight_raw = nn.Parameter(torch.zeros(1, 1, 25, 1))
             
-            # normalize code debug
-            last_hidden = torch.ones(1, 25, 1) * float('-inf')
-            last_hidden[0][Define.LAYER_IDX][0] = 10.0
-            self.weight_raw = nn.Parameter(last_hidden)
-            self.weight_raw.requires_grad = False
+            # specific layer
+            if Define.LAYER_IDX is not None:
+                last_hidden = torch.ones(1, 1, 25, 1) * float('-inf')
+                last_hidden[0][0][Define.LAYER_IDX][0] = 10.0
+                self.weight_raw = nn.Parameter(last_hidden)
+                self.weight_raw.requires_grad = False
 
         self.d_feat = self.codebook_config["representation_dim"]
         self.q_linear = nn.Linear(self.d_feat, self.d_word_vec)
@@ -555,8 +556,11 @@ class SoftMultiAttCodebook(pl.LightningModule):
 
     def get_new_embedding(self, ref, *args, **kwargs):
         """
-        ref: Tensor with size (vocab_size, 25, representation_dim).
+        ref: 
+            Sup: Tensor with size (B=1, vocab_size, 25, representation_dim).
+            Unsup: Tensor with size (B, L, 25, representation_dim).
         """
+        B = ref.shape[0]
         try:
             assert ref.device == self.device
         except:
@@ -565,17 +569,15 @@ class SoftMultiAttCodebook(pl.LightningModule):
 
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
             weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=1) * ref
-            ref = weighted_sum.sum(dim=1)
-        q = self.q_linear(ref).view(-1, self.num_heads, self.d_word_vec // self.num_heads)
-        q = q.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x vocab_size x dword // nH
+            ref = weighted_sum.sum(dim=2)
+        q = self.q_linear(ref).view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
+        q = q.transpose(1, 2).contiguous()  # B x nH x vocab_size x dword // nH
         k = self.att_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
         k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x codebook_size x dword // nH
         v = self.emb_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
         v = v.transpose(0, 1).unsqueeze(0).contiguous()
         weighted_embedding, attn = self.attention(q, k, v)
-        weighted_embedding = weighted_embedding.squeeze(0).transpose(0, 1).contiguous().view(-1, self.d_word_vec)
-        weighted_embedding[Constants.PAD].fill_(0)
-
+        weighted_embedding = weighted_embedding.transpose(1, 2).contiguous().view(B, -1, self.d_word_vec)
         # print(torch.sum(self.att_banks), torch.sum(self.emb_banks))
         
         return weighted_embedding

@@ -43,7 +43,7 @@ class S3PRLExtractor(pl.LightningModule):
             unsup_repr = []
             for d_list, repr in zip(avg_frames, representation_list):
                 pos = 0
-                for i, (t, d) in enumerate(zip(text, d_list)):
+                for i, d in enumerate(d_list):
                     if d > 0 and not torch_exist_nan(repr[:, pos: pos + d, :]):
                         repr[:, i] = torch.mean(repr[:, pos: pos + d, :], axis=1)
                     else:
@@ -52,7 +52,9 @@ class S3PRLExtractor(pl.LightningModule):
                 repr = repr[:, :len(d_list)]
                 unsup_repr.append(repr.transpose(0, 1))
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, layer, dim
-            return unsup_repr.contiguous()
+            if Define.DEBUG:
+                print(unsup_repr.shape)
+            return unsup_repr
         else:
             lang_id = info["lang_id"]
             n_symbols = len(LANG_ID2SYMBOLS[lang_id])
@@ -75,7 +77,10 @@ class S3PRLExtractor(pl.LightningModule):
                 else:
                     phn_repr[i] = torch.mean(torch.cat(table[i], axis=1), axis=1)
 
-            return phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
+            phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
+            if Define.DEBUG:
+                print(phn_repr.shape)
+            return phn_repr
 
 
 class HubertExtractor(S3PRLExtractor):
@@ -106,15 +111,17 @@ class MelExtractor(pl.LightningModule):
             unsup_repr = []
             for d_list, repr in zip(avg_frames, representation_list):
                 pos = 0
-                for i, (t, d) in enumerate(zip(text, d_list)):
+                for i, d in enumerate(d_list):
                     if d > 0 and not torch_exist_nan(repr[pos: pos + d, :]):
                         repr[i] = torch.mean(repr[pos: pos + d, :], axis=0)
                     else:
                         repr[i] = torch.zeros(Define.UPSTREAM_DIM)
                     pos += d
-                repr = repr[:, :len(d_list)]
+                repr = repr[:len(d_list)]
                 unsup_repr.append(repr)
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, 80
+            if Define.DEBUG:
+                print(unsup_repr.shape)
             return unsup_repr
         else:
             lang_id = info["lang_id"]
@@ -139,7 +146,10 @@ class MelExtractor(pl.LightningModule):
                 else:
                     phn_repr[i] = torch.mean(torch.cat(table[i], axis=0), axis=0)
 
-            return phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
+            phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
+            if Define.DEBUG:
+                print(phn_repr.shape)
+            return phn_repr
 
 
 if __name__ == "__main__":

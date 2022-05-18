@@ -41,7 +41,7 @@ class FSCLCollate(object):
         idx_arr = np.arange(data_size)
         if re_id:
             for idx in idx_arr:
-                data[idx]["text"] += self.re_id_increment[data[idx]["language"]]
+                data[idx]["text"] += self.re_id_increment[data[idx]["lang_id"]]
         
         idx_arr = idx_arr.reshape((-1, batch_size))
 
@@ -58,7 +58,7 @@ class FSCLCollate(object):
             qry_out.append(reprocess(data, qry_ids))
             # pad_qry = time.time() - st1
 
-            lang_id = data[idxs[0]]["language"]
+            lang_id = data[idxs[0]]["lang_id"]
             repr_info = {}
             repr_info["lang_id"] = lang_id
             repr_info["texts"] = [data[idx]["text"] for idx in idxs]
