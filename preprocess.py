@@ -4,8 +4,8 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 import os
 
 from UnsupSeg import load_model_from_tag, ModelTag
-from data_lib.preprocess import *
-from data_lib.audio import AUDIO_CONFIG
+from dlhlp_lib.parsers.preprocess import *
+from dlhlp_lib.audio import AUDIO_CONFIG
 from Parsers.parser import DataParser
 
 
@@ -38,4 +38,5 @@ if __name__ == "__main__":
     # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/CSS10/german")
     # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT")
     # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/kss")
-    preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
+    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
+    preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/GlobalPhone/french")

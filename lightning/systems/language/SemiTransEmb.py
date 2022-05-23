@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.utils.log import loss2dict
@@ -9,6 +10,7 @@ from lightning.utils.tool import LightningMelGAN
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.callbacks.language.fscl_saver import Saver
+from lightning.callbacks import GlobalProgressBar
 from Objects.visualization import CodebookAnalyzer
 from lightning.model.reference_extractor import HubertExtractor, XLSR53Extractor, Wav2Vec2Extractor, MelExtractor
 from transformer import Constants
@@ -67,6 +69,8 @@ class SemiTransEmbSystem(AdaptorSystem):
     def build_embedding_table(self, repr_info):
         with torch.no_grad():
             ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+        print(ref_phn_feats.requires_grad)
+        torch.cuda.memory_summary()
         embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats)
         embedding = embedding.squeeze(0)
         embedding[Constants.PAD].fill_(0)
@@ -78,6 +82,8 @@ class SemiTransEmbSystem(AdaptorSystem):
     def get_unsup_representation(self, repr_info):
         with torch.no_grad():
             unsup_repr = self.reference_extractor.extract(repr_info, norm=False, no_text=True)
+        print(unsup_repr.requires_grad)
+        torch.cuda.memory_summary()
         unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
 
         if Define.DEBUG:
@@ -186,3 +192,29 @@ class SemiTransEmbSystem(AdaptorSystem):
                 step=step,
             )
             plt.close(fig)
+
+    def configure_callbacks(self):
+        # PL does not support cross reduction directly for multiple dataloaders yet.
+        # Checkpoint saver
+        save_step = self.train_config["step"]["save_step"]
+        checkpoint = ModelCheckpoint(
+            monitor="Val/Total Loss/dataloader_idx_0", mode="min",
+            every_n_train_steps=save_step, save_top_k=-1
+        )
+
+        # Progress bars (step/epoch)
+        outer_bar = GlobalProgressBar(process_position=1)
+
+        # Monitor learning rate / gpu stats
+        lr_monitor = LearningRateMonitor()
+        # gpu_monitor = GPUStatsMonitor(  stablize!
+        #     memory_utilization=True, gpu_utilization=True, intra_step_time=True, inter_step_time=True
+        # )
+        
+        # Save figures/audios/csvs
+        saver = self.build_saver()
+        if isinstance(saver, list):
+            callbacks = [checkpoint, outer_bar, lr_monitor, *saver]
+        else:
+            callbacks = [checkpoint, outer_bar, lr_monitor, saver]
+        return callbacks

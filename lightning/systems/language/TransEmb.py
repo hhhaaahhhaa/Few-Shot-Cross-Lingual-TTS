@@ -65,16 +65,21 @@ class TransEmbSystem(AdaptorSystem):
         self.adaptation_steps = self.algorithm_config["adapt"]["train"]["steps"]
 
     def build_embedding_table(self, batch):
-        _, _, ref_phn_feats, lang_id = batch[0]
+        _, _, repr_info, lang_id = batch[0]
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
-            ref_phn_feats = ref_phn_feats.squeeze(0)
-            ref_phn_feats[Constants.PAD].fill_(0)
+            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
 
         embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
+        embedding = embedding.squeeze(0)
+        embedding[Constants.PAD].fill_(0)
+
+        if Define.DEBUG:
+            print("Embedding shape ", embedding.shape)
         return embedding
 
     def common_step(self, batch, batch_idx, train=True):
+        if Define.DEBUG:
+            print("Extract embedding... ")
         emb_table = self.build_embedding_table(batch)
         _, qry_batch, _, _ = batch[0]
         qry_batch = qry_batch[0]
@@ -119,7 +124,6 @@ class TransEmbSystem(AdaptorSystem):
         _, _, ref_phn_feats, lang_id = batch[0]
         with torch.no_grad():
             ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
-            ref_phn_feats = ref_phn_feats.squeeze(0)
             ref_phn_feats[Constants.PAD].fill_(0)
         
         matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)

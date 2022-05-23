@@ -546,7 +546,7 @@ class SoftMultiAttCodebook(pl.LightningModule):
                 self.weight_raw = nn.Parameter(last_hidden)
                 self.weight_raw.requires_grad = False
 
-        self.d_feat = self.codebook_config["representation_dim"]
+        self.d_feat = Define.UPSTREAM_DIM
         self.q_linear = nn.Linear(self.d_feat, self.d_word_vec)
 
         # att(feats, att_banks) -> token_id weights -> emb_banks
@@ -568,7 +568,7 @@ class SoftMultiAttCodebook(pl.LightningModule):
         ref[ref != ref] = 0
 
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=1) * ref
+            weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=2) * ref
             ref = weighted_sum.sum(dim=2)
         q = self.q_linear(ref).view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
         q = q.transpose(1, 2).contiguous()  # B x nH x vocab_size x dword // nH
@@ -590,8 +590,8 @@ class SoftMultiAttCodebook(pl.LightningModule):
         ref[ref != ref] = 0
 
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=1) * ref
-            ref = weighted_sum.sum(dim=1)
+            weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=2) * ref
+            ref = weighted_sum.sum(dim=2)  # 1 x vocab_size x dword
         q = self.q_linear(ref).view(-1, self.num_heads, self.d_word_vec // self.num_heads)
         q = q.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x vocab_size x dword // nH
         k = self.att_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
@@ -600,7 +600,7 @@ class SoftMultiAttCodebook(pl.LightningModule):
         v = v.transpose(0, 1).unsqueeze(0).contiguous()
         _, attn = self.attention(q, k, v)
 
-        mask = torch.nonzero(ref.sum(dim=1), as_tuple=True)
+        mask = torch.nonzero(ref.sum(dim=2).squeeze(0), as_tuple=True)  # vocab_size
         attn = attn.squeeze(0)
         infos = []
         for i in range(self.num_heads):
@@ -614,12 +614,12 @@ class SoftMultiAttCodebook(pl.LightningModule):
             infos.append(info)
         
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            weights = torch.nn.functional.softmax(self.weight_raw.data, dim=1)
+            weights = torch.nn.functional.softmax(self.weight_raw.data, dim=2)
             weight_info = MatchingGraphInfo({
                 "title": "Layer Weight",
                 "y_labels": ["w"],
                 "x_labels": [str(i) for i in range(25)],
-                "attn": weights.squeeze(2).detach().cpu().numpy(),
+                "attn": weights.squeeze(0).squeeze(2).detach().cpu().numpy(),
                 "quantized": False,
             })
             infos.append(weight_info)

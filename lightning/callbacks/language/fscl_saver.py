@@ -53,7 +53,10 @@ class Saver(Callback):
         # Synthesis one sample and log to CometLogger
         if USE_COMET:
             if step % pl_module.train_config["step"]["synth_step"] == 0 and pl_module.local_rank == 0:
-                metadata = {'sup_ids': batch[0][0][0][0]}
+                if isinstance(batch, dict):
+                    metadata = {'sup_ids': batch["sup"][0][0][0][0]}
+                else:
+                    metadata = {'sup_ids': batch[0][0][0][0]}
                 fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
                     _batch, output, vocoder, self.preprocess_config
                 )
@@ -147,8 +150,8 @@ class Saver(Callback):
         test_adaptation_steps = pl_module.test_adaptation_steps # total fine-tune steps
         vocoder = pl_module.vocoder
 
-        sup_ids = batch[0][0][0][0]
-        qry_ids = batch[0][1][0][0]
+        sup_ids = batch[0][0][0]
+        qry_ids = batch[1][0][0]
         SQids = f"{'-'.join(sup_ids)}.{'-'.join(qry_ids)}"
         task_id = trainer.datamodule.test_SQids2Tid[SQids]
 

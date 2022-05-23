@@ -101,7 +101,7 @@ class FSCLDataModule(pl.LightningDataModule):
             self.train_task_dataset,
             batch_size=1,
             shuffle=True,
-            num_workers=0,
+            num_workers=2,
             collate_fn=lambda batch: batch,
         )
         return self.train_loader
@@ -190,7 +190,7 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=True,
             drop_last=True,
-            num_workers=0,
+            num_workers=2,
             collate_fn=self.collate.collate_fn(False),
         )
         return self.train_loader

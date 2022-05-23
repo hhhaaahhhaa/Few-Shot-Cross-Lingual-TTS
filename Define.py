@@ -4,6 +4,7 @@ import json
 
 
 DEBUG = False
+CUDA_LAUNCH_BLOCKING = True  # TODO: Always crash if this is false
 DATAPARSERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,11 +38,20 @@ UPSTREAM_DIM = 80
 LAYER_IDX = None
 UPSTREAM_LAYER = 0
 
-if UPSTREAM == "mel":
-    UPSTREAM_DIM = 80
-elif UPSTREAM in ["hubert", "wav2vec2", "xlsr53"]:
-    UPSTREAM_DIM = 1024
-    UPSTREAM_LAYER = 25
+def set_upstream(x):
+    global UPSTREAM
+    global UPSTREAM_DIM
+    global UPSTREAM_LAYER
+
+    if x == "mel":
+        UPSTREAM = x
+        UPSTREAM_DIM = 80
+    elif x in ["hubert", "wav2vec2", "xlsr53"]:
+        UPSTREAM = x
+        UPSTREAM_DIM = 1024
+        UPSTREAM_LAYER = 25
+    else:
+        raise NotImplementedError
 
 
 if __name__ == "__main__":

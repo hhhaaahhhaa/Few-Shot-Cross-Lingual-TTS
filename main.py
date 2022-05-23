@@ -26,7 +26,7 @@ if quiet:
     import logging
     # configure logging at the root level of lightning
     logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
-if Define.DEBUG:
+if Define.CUDA_LAUNCH_BLOCKING:
     os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 
@@ -275,7 +275,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     Define.EXP_IDX = args.index_exp
     Define.LAYER_IDX = args.layer_exp
-    Define.UPSTREAM = args.upstream_exp
+    Define.set_upstream(args.upstream_exp)
     print(f"Task {args.index_exp}, Layer {args.layer_exp}, Upstream {args.upstream_exp}...")
 
     # Read Config

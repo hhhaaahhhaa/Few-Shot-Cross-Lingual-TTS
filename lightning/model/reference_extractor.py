@@ -32,7 +32,7 @@ class S3PRLExtractor(pl.LightningModule):
                 representation = torch.stack(representation["hidden_states"], dim=1)  # bs, layer, L, dim
                 if norm:
                     representation = torch.nn.functional.normalize(representation, dim=3)
-                representation_list.extend([r for r in representation])
+                representation_list.extend([r.detach().cpu() for r in representation])
                 wavs = []
 
         # SSL representation phoneme-level average
@@ -53,8 +53,8 @@ class S3PRLExtractor(pl.LightningModule):
                 unsup_repr.append(repr.transpose(0, 1))
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, layer, dim
             if Define.DEBUG:
-                print(unsup_repr.shape)
-            return unsup_repr
+                self.log(unsup_repr.shape)
+            return unsup_repr.to(self.device)
         else:
             lang_id = info["lang_id"]
             n_symbols = len(LANG_ID2SYMBOLS[lang_id])
@@ -79,8 +79,11 @@ class S3PRLExtractor(pl.LightningModule):
 
             phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
             if Define.DEBUG:
-                print(phn_repr.shape)
-            return phn_repr
+                self.log(phn_repr.shape)
+            return phn_repr.to(self.device)
+
+    def log(self, msg):
+        print("[SSL reference extractor]: ", msg)
 
 
 class HubertExtractor(S3PRLExtractor):
@@ -120,8 +123,8 @@ class MelExtractor(pl.LightningModule):
                 repr = repr[:len(d_list)]
                 unsup_repr.append(repr)
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, 80
-            if Define.DEBUG:
-                print(unsup_repr.shape)
+            # if Define.DEBUG:
+            #     self.log(unsup_repr.shape)
             return unsup_repr
         else:
             lang_id = info["lang_id"]
@@ -147,9 +150,12 @@ class MelExtractor(pl.LightningModule):
                     phn_repr[i] = torch.mean(torch.cat(table[i], axis=0), axis=0)
 
             phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
-            if Define.DEBUG:
-                print(phn_repr.shape)
+            # if Define.DEBUG:
+            #     self.log(phn_repr.shape)
             return phn_repr
+
+    def log(self, msg):
+        print("[Mel reference extractor]: ", msg)
 
 
 if __name__ == "__main__":

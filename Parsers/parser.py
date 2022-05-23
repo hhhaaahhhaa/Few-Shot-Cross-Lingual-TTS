@@ -2,9 +2,9 @@ import os
 import glob
 import json
 
-from data_lib.Feature import Feature
-from data_lib.QueryParsers import SFQueryParser, NestSFQueryParser
-from data_lib.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO
+from dlhlp_lib.parsers.Feature import Feature
+from dlhlp_lib.parsers.QueryParsers import SFQueryParser, NestSFQueryParser
+from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO
 
 
 class DataParser(object):

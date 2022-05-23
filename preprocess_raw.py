@@ -11,6 +11,7 @@ from Parsers.css10 import CSS10RawParser
 from Parsers.jsut import JSUTRawParser
 from Parsers.kss import KSSRawParser
 from Parsers.libritts import LibriTTSRawParser
+from Parsers.globalphone import GlobalPhoneRawParser
 
 
 def wav_normalization(wav: np.array) -> np.array:
@@ -35,7 +36,8 @@ def imap_preprocess_func(task):
     preprocess_func(*task)
 
 
-def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=os.cpu_count()-2):
+def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=4):
+    os.makedirs(preprocessed_root, exist_ok=True)
     print(f"Parsing raw data from {raw_root}...")
     if parser_name == "AISHELL-3":
         raw_parser = AISHELL3RawParser(raw_root)
@@ -47,6 +49,8 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=os.cpu_co
         raw_parser = KSSRawParser(raw_root)
     elif parser_name == "LibriTTS":
         raw_parser = LibriTTSRawParser(raw_root)
+    elif parser_name == "GlobalPhone":
+        raw_parser = GlobalPhoneRawParser(raw_root)
     else:
         raise NotImplementedError
 
@@ -70,8 +74,9 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=os.cpu_co
 
 
 if __name__ == "__main__":
-    preprocess_raw("AISHELL-3", "/mnt/d/Data/AISHELL-3", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/AISHELL-3")
-    preprocess_raw("CSS10", "/mnt/d/Data/CSS10/german", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/CSS10/german")
-    preprocess_raw("JSUT", "/mnt/d/Data/jsut_ver1.1", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT")
-    preprocess_raw("KSS", "/mnt/d/Data/kss", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/kss")
-    preprocess_raw("LibriTTS", "/mnt/d/Data/LibriTTS", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
+    # preprocess_raw("AISHELL-3", "/mnt/d/Data/AISHELL-3", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/AISHELL-3")
+    # preprocess_raw("CSS10", "/mnt/d/Data/CSS10/german", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/CSS10/german")
+    # preprocess_raw("JSUT", "/mnt/d/Data/jsut_ver1.1", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT")
+    # preprocess_raw("KSS", "/mnt/d/Data/kss", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/kss")
+    # preprocess_raw("LibriTTS", "/mnt/d/Data/LibriTTS", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
+    preprocess_raw("GlobalPhone", "/mnt/d/Data/GlobalPhone/French", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/GlobalPhone/french")
