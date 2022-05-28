@@ -26,7 +26,7 @@ class S3PRLExtractor(pl.LightningModule):
 
         wavs = []
         for i in range(len(info["raw-feat"])):
-            wavs.append(info["raw-feat"][i].cuda())
+            wavs.append(info["raw-feat"][i].to(self.device))
             if (i + 1) % batch_size == 0 or i == len(info["raw-feat"]) - 1:
                 representation = self.ssl_extractor(wavs)
                 representation = torch.stack(representation["hidden_states"], dim=1)  # bs, layer, L, dim

@@ -4,7 +4,7 @@ import json
 
 
 DEBUG = False
-CUDA_LAUNCH_BLOCKING = True  # TODO: Always crash if this is false
+CUDA_LAUNCH_BLOCKING = False  # TODO: Always crash if this is false
 DATAPARSERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")

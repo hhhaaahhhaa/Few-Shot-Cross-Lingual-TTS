@@ -34,9 +34,9 @@ def preprocess(root):
 
 
 if __name__ == "__main__":
-    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/AISHELL-3")
-    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/CSS10/german")
-    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT")
-    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/kss")
-    # preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
-    preprocess("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/GlobalPhone/french")
+    preprocess("../fscl/AISHELL-3")
+    preprocess("../fscl/CSS10/german")
+    preprocess("../fscl/JSUT")
+    preprocess("../fscl/kss")
+    preprocess("../fscl/LibriTTS")
+    preprocess("../fscl/GlobalPhone/french")

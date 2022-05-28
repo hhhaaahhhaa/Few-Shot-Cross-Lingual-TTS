@@ -78,7 +78,7 @@ class FastSpeech2DataModule(pl.LightningDataModule):
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=True,
             drop_last=True,
-            num_workers=2,
+            num_workers=4,
             collate_fn=self.collate.collate_fn(False, re_id=self.re_id),  # CAUTION: tune does not need re_id
         )
         return self.train_loader

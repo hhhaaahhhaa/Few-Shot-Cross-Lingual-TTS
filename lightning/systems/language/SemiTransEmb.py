@@ -69,8 +69,8 @@ class SemiTransEmbSystem(AdaptorSystem):
     def build_embedding_table(self, repr_info):
         with torch.no_grad():
             ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
-        print(ref_phn_feats.requires_grad)
-        torch.cuda.memory_summary()
+        # print(ref_phn_feats.requires_grad)
+        # torch.cuda.memory_summary()
         embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats)
         embedding = embedding.squeeze(0)
         embedding[Constants.PAD].fill_(0)
@@ -82,8 +82,8 @@ class SemiTransEmbSystem(AdaptorSystem):
     def get_unsup_representation(self, repr_info):
         with torch.no_grad():
             unsup_repr = self.reference_extractor.extract(repr_info, norm=False, no_text=True)
-        print(unsup_repr.requires_grad)
-        torch.cuda.memory_summary()
+        # print(unsup_repr.requires_grad)
+        # torch.cuda.memory_summary()
         unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
 
         if Define.DEBUG:
@@ -166,7 +166,7 @@ class SemiTransEmbSystem(AdaptorSystem):
         if self.codebook_type != "table-sep":
             _, _, ref_phn_feats, lang_id = batch[0]
             with torch.no_grad():
-                ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
+                ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
                 ref_phn_feats = ref_phn_feats.squeeze(0)
                 ref_phn_feats[Constants.PAD].fill_(0)
 
@@ -178,9 +178,8 @@ class SemiTransEmbSystem(AdaptorSystem):
         step = self.global_step + 1
         _, _, ref_phn_feats, lang_id = batch[0]
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
-            ref_phn_feats = ref_phn_feats.squeeze(0)
-            ref_phn_feats[Constants.PAD].fill_(0)
+            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
+            ref_phn_feats[0][Constants.PAD].fill_(0)
         
         matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
         for matching in matchings:

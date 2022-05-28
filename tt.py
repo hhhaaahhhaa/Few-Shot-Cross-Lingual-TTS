@@ -7,12 +7,12 @@ from lightning.utils.tool import torch_exist_nan
 from Parsers.parser import DataParser
 
 
-data_parser = DataParser("./preprocessed_data/LibriTTS")
+data_parser = DataParser("/work/u5550322/fscl/LibriTTS")
 
 
 def go(extractor, ppp):
     batch_size = 1
-    queries = data_parser.get_all_queries()[:1024]
+    queries = data_parser.get_all_queries()[:10]
     wavs = []
     q_temp = []
     n_frames = 0

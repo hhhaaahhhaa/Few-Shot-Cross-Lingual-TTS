@@ -74,9 +74,9 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=4):
 
 
 if __name__ == "__main__":
-    # preprocess_raw("AISHELL-3", "/mnt/d/Data/AISHELL-3", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/AISHELL-3")
-    # preprocess_raw("CSS10", "/mnt/d/Data/CSS10/german", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/CSS10/german")
-    # preprocess_raw("JSUT", "/mnt/d/Data/jsut_ver1.1", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT")
-    # preprocess_raw("KSS", "/mnt/d/Data/kss", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/kss")
-    # preprocess_raw("LibriTTS", "/mnt/d/Data/LibriTTS", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
-    preprocess_raw("GlobalPhone", "/mnt/d/Data/GlobalPhone/French", "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/GlobalPhone/french")
+    preprocess_raw("AISHELL-3", "/work/u5550322/AISHELL-3", "/work/u5550322/fscl/AISHELL-3")
+    preprocess_raw("CSS10", "/work/u5550322/CSS10/german", "/work/u5550322/fscl/CSS10/german")
+    preprocess_raw("JSUT", "/work/u5550322/jsut_ver1.1", "/work/u5550322/fscl/JSUT")
+    preprocess_raw("KSS", "/work/u5550322/kss", "/work/u5550322/fscl/kss")
+    preprocess_raw("LibriTTS", "/work/u5550322/LibriTTS", "/work/u5550322/fscl/LibriTTS")
+    preprocess_raw("GlobalPhone", "/work/u5550322/GlobalPhone/French", "/work/u5550322/fscl/GlobalPhone/french")

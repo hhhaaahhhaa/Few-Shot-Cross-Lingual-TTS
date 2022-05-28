@@ -111,7 +111,7 @@ class TransEmbSystem(AdaptorSystem):
         if self.codebook_type != "table-sep":
             _, _, ref_phn_feats, lang_id = batch[0]
             with torch.no_grad():
-                ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
+                ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
                 ref_phn_feats = ref_phn_feats.squeeze(0)
                 ref_phn_feats[Constants.PAD].fill_(0)
 
@@ -123,8 +123,8 @@ class TransEmbSystem(AdaptorSystem):
         step = self.global_step + 1
         _, _, ref_phn_feats, lang_id = batch[0]
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=True)
-            ref_phn_feats[Constants.PAD].fill_(0)
+            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
+            ref_phn_feats[0][Constants.PAD].fill_(0)
         
         matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
         for matching in matchings:

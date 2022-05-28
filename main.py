@@ -265,7 +265,7 @@ if __name__ == "__main__":
         default=0,
     )
     parser.add_argument(
-        "-le", "--layer_exp", help="1-24",
+        "-le", "--layer_exp", help="1-24", type=int,
         default=None,
     )
     parser.add_argument(
