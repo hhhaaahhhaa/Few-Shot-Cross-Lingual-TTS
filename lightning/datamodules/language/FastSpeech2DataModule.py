@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
-from lightning.collates import LanguageTaskCollate
+from lightning.collates import LanguageCollate, TextCollate
 from lightning.datasets.language import FastSpeech2Dataset, TextDataset
 from ..utils import EpisodicInfiniteWrapper
 
@@ -25,7 +25,8 @@ class FastSpeech2DataModule(pl.LightningDataModule):
         self.val_step = self.train_config["step"]["val_step"]
 
         self.re_id = True  # TODO: should be controlled by client directly
-        self.collate = LanguageTaskCollate()
+        self.collate = LanguageCollate()
+        self.collate2 = TextCollate()
 
     def setup(self, stage=None):
         spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
@@ -36,14 +37,14 @@ class FastSpeech2DataModule(pl.LightningDataModule):
                 FastSpeech2Dataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=True, drop_last=True, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
                 FastSpeech2Dataset(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=False, drop_last=False, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'val' in data_config['subsets']
             ]
             self.train_dataset = ConcatDataset(self.train_datasets)
@@ -53,8 +54,11 @@ class FastSpeech2DataModule(pl.LightningDataModule):
 
         if stage in (None, 'test', 'predict'):
             self.test_datasets = [
-                TextDataset(data_config['subsets']['test'], data_config) 
-                for data_config in self.data_configs if 'test' in data_config['subsets']
+                TextDataset(
+                    data_config['subsets']['test'],
+                    Define.DATAPARSERS[data_config["name"]],
+                    data_config
+                ) for data_config in self.data_configs if 'test' in data_config['subsets']
             ]
             self.test_dataset = ConcatDataset(self.test_datasets)
             self._test_setup()
@@ -101,6 +105,12 @@ class FastSpeech2DataModule(pl.LightningDataModule):
             self.test_dataset,
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=False,
-            collate_fn=self.test_datasets[0].collate_fn,
+            collate_fn=self.collate2.collate_fn(False, re_id=self.re_id),
         )
         return self.test_loader
+
+
+class FastSpeech2TuneDataModule(FastSpeech2DataModule):
+    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+        super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir)
+        self.re_id = False

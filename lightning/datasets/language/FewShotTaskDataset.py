@@ -7,7 +7,7 @@ from learn2learn.data.transforms import FusedNWaysKShots, LoadData
 from learn2learn.data.task_dataset import DataDescription
 from learn2learn.utils.lightning import EpisodicBatcher
 
-from lightning.collates import FSCLCollate, LanguageTaskCollate
+from lightning.collates import FSCLCollate, LanguageCollate
 
 
 def few_shot_task_dataset(_dataset, ways, shots, queries, n_tasks_per_label=-1, epoch_length=-1, type="spk", *args, **kwargs):
@@ -16,7 +16,7 @@ def few_shot_task_dataset(_dataset, ways, shots, queries, n_tasks_per_label=-1, 
     """
     if type == "spk":
         id2lb = get_multispeaker_id2lb(_dataset.datasets)
-        _collate = LanguageTaskCollate()  # TODO: Change to speaker meta learning version
+        _collate = LanguageCollate()  # TODO: Change to speaker meta learning version
     else:
         id2lb = get_multilingual_id2lb(_dataset.datasets)
         _collate = FSCLCollate()

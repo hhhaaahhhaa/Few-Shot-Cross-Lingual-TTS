@@ -7,6 +7,7 @@ from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, TextDatas
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
 from lightning.collates import UnsupFSCLCollate
+from .FastSpeech2DataModule import FastSpeech2DataModule
 
 
 class FSCLDataModule(pl.LightningDataModule):
@@ -156,14 +157,14 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
                 UnsupFSCLDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=True, drop_last=True, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
                 UnsupFSCLDataset(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=False, drop_last=False, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'val' in data_config['subsets']
             ]
             self.train_dataset = ConcatDataset(self.train_datasets)
@@ -236,3 +237,33 @@ class SemiFSCLDataModule(pl.LightningDataModule):
             self.sup_datamodule.val_dataloader(),
             self.unsup_datamodule.val_dataloader()
         ]
+
+
+class SemiFSCLTuneDataModule(pl.LightningDataModule):
+    """
+    Concat FastSpeech2/UnsupFSCL datamodule. Contains one batch from both datamodules.
+    Currently can not use this dataset in test/predict stage.
+    """
+    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+        super().__init__()
+        self.sup_datamodule = FastSpeech2DataModule(data_configs["sup"], 
+                                                train_config, algorithm_config, log_dir, result_dir)
+        self.sup_datamodule.re_id = False
+        self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
+                                                train_config, algorithm_config, log_dir, result_dir)
+
+    def setup(self, stage=None):
+        self.sup_datamodule.setup(stage)
+        self.unsup_datamodule.setup(stage)
+
+    def train_dataloader(self):
+        return {
+            "sup": self.sup_datamodule.train_dataloader(),
+            "unsup": self.unsup_datamodule.train_dataloader()
+        }
+
+    def val_dataloader(self):
+        return self.sup_datamodule.val_dataloader()
+
+    def test_dataloader(self):
+        return self.sup_datamodule.test_dataloader()

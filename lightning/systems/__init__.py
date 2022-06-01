@@ -17,6 +17,7 @@ SYSTEM = {
     "fscl": language.TransEmbSystem,
     "fscl-tune": language.TransEmbTuneSystem,
     "semi-fscl": language.SemiTransEmbSystem,
+    "semi-fscl-tune": language.SemiTransEmbTuneSystem,
     "multilingual-baseline": language.BaselineSystem,
     "multilingual-baseline-tune": language.BaselineSystem,
 }

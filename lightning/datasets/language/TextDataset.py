@@ -1,49 +1,58 @@
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import json
 
+from Parsers.parser import DataParser
 from lightning.utils.tool import pad_1D
 from text import text_to_sequence
 
 
 class TextDataset(Dataset):
-    def __init__(self, filepath, preprocess_config):
-        self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
+    def __init__(self, filename, data_parser: DataParser, config):
+        self.data_parser = data_parser
 
-        print("filepath: ", filepath)
-        self.basename, self.text, self.raw_text = self.process_meta(
-            filepath
-        )
-        self.lang_id = preprocess_config.get("lang_id", 0)
+        self.name = config["name"]
+        self.lang_id = config["lang_id"]
+        self.cleaners = config["text_cleaners"]
+
+        self.basename, self.speaker = self.process_meta(filename)
+        with open(self.data_parser.speakers_path, 'r', encoding='utf-8') as f:
+            self.speakers = json.load(f)
+            self.speaker_map = {spk: i for i, spk in enumerate(self.speakers)}
 
     def __len__(self):
-        return len(self.text)
+        return len(self.basename)
 
     def __getitem__(self, idx):
         basename = self.basename[idx]
-        raw_text = self.raw_text[idx]
-        phone = np.array(text_to_sequence(self.text[idx], self.cleaners, self.lang_id))
+        speaker = self.speaker[idx]
+        speaker_id = self.speaker_map[speaker]
+        query = {
+            "spk": speaker,
+            "basename": basename,
+        }
 
-        return (basename, phone, raw_text)
+        phonemes = self.data_parser.phoneme.read_from_query(query)
+        raw_text = self.data_parser.text.read_from_query(query)
+        phonemes = f"{{{phonemes}}}"
+        text = np.array(text_to_sequence(phonemes, self.cleaners, self.lang_id))
+
+        sample = {
+            "id": basename,
+            "speaker": speaker_id,
+            "text": text,
+            "raw_text": raw_text,
+        }
+
+        return sample
 
     def process_meta(self, filename):
         with open(filename, "r", encoding="utf-8") as f:
             name = []
-            text = []
-            raw_text = []
+            speaker = []
             for line in f.readlines():
                 n, s, t, r = line.strip("\n").split("|")
                 name.append(n)
-                text.append(t)
-                raw_text.append(r)
-            return name, text, raw_text
-    
-    def collate_fn(self, data):
-        ids = [d[0] for d in data]
-        texts = [d[1] for d in data]
-        raw_texts = [d[2] for d in data]
-        text_lens = np.array([text.shape[0] for text in texts])
-
-        texts = pad_1D(texts)
-
-        return (ids, raw_texts, torch.from_numpy(texts).long(), torch.from_numpy(text_lens), max(text_lens))
+                speaker.append(s)
+            return name, speaker

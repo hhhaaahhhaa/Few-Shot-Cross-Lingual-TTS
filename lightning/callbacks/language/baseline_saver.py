@@ -66,6 +66,8 @@ class Saver(BaseSaver):
         self.val_loss_dicts = []
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+        if dataloader_idx == 1:  # unlabeled data, do nothing
+            return
         loss = outputs['losses']
         output = outputs['output']
         _batch = outputs['_batch']

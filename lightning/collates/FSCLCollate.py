@@ -122,7 +122,7 @@ class UnsupFSCLCollate(object):
             idx_arr = np.argsort(-len_arr)
         else:
             idx_arr = np.arange(data_size)
-        output = reprocess(data, idx_arr)
+        output = reprocess(data, idx_arr, mode="unsup")
 
         repr_info = {}
         repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]

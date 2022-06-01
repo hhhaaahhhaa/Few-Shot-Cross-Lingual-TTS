@@ -1,2 +1,2 @@
-from .FastSpeech2DataModule import FastSpeech2DataModule
-from .FSCLDataModule import FSCLDataModule, UnsupFSCLDataModule, SemiFSCLDataModule
+from .FastSpeech2DataModule import FastSpeech2DataModule, FastSpeech2TuneDataModule
+from .FSCLDataModule import FSCLDataModule, UnsupFSCLDataModule, SemiFSCLDataModule, SemiFSCLTuneDataModule

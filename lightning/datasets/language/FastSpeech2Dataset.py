@@ -13,11 +13,9 @@ class FastSpeech2Dataset(Dataset):
     """
     Monolingual, paired dataset for FastSpeech2.
     """
-    def __init__(self, filename, data_parser: DataParser, config=None, sort=False, drop_last=False, spk_refer_wav=False):
+    def __init__(self, filename, data_parser: DataParser, config, spk_refer_wav=False):
         self.data_parser = data_parser
         self.spk_refer_wav = spk_refer_wav
-        self.sort = sort
-        self.drop_last = drop_last
 
         self.name = config["name"]
         self.lang_id = config["lang_id"]

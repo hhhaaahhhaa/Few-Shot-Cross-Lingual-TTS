@@ -1,2 +1,3 @@
 from .FSCLCollate import FSCLCollate, UnsupFSCLCollate
-from .LanguageCollate import LanguageTaskCollate
+from .LanguageCollate import LanguageCollate
+from .TextCollate import TextCollate

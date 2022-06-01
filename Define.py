@@ -3,11 +3,15 @@ import numpy as np
 import json
 
 
+LOCAL = True
 DEBUG = False
-CUDA_LAUNCH_BLOCKING = False  # TODO: Always crash if this is false
+CUDA_LAUNCH_BLOCKING = False
 DATAPARSERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if LOCAL:
+    CUDA_LAUNCH_BLOCKING = True  # TODO: Always crash on my PC if false
 
 
 def merge_stats(stats_dict, keys):
@@ -31,7 +35,7 @@ def merge_stats(stats_dict, keys):
 
 
 # Experiment parameters
-USE_COMET = True
+USE_COMET = False
 EXP_IDX = 0
 UPSTREAM = "mel"
 UPSTREAM_DIM = 80

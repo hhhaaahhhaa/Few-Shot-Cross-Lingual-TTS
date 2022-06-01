@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from pytorch_lightning.profiler import AdvancedProfiler
+from Objects.config import LanguageDataConfigReader
 from Parsers.parser import DataParser
 
 from config.comet import COMET_CONFIG
@@ -35,7 +36,7 @@ TRAINER_CONFIG = {
     "accelerator": "ddp" if torch.cuda.is_available() else None,
     "auto_select_gpus": True,
     "limit_train_batches": 1.0,  # Useful for fast experiment
-    "deterministic": True,
+    # "deterministic": True,
     "process_position": 1,
     "profiler": 'simple',
 }
@@ -52,7 +53,7 @@ def main(args, configs):
         parse_prep = {
             "name": prep["dataset"],
             "lang_id": prep["lang_id"],
-            "data-dir": prep["path"]["preprocessed_path"], 
+            "data_dir": prep["path"]["preprocessed_path"], 
             "subsets": prep["subsets"],
             "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
         }
@@ -62,7 +63,7 @@ def main(args, configs):
     import json
     keys = []
     for data_config in data_configs:
-        Define.DATAPARSERS[data_config["name"]] = DataParser(data_config["data-dir"])
+        Define.DATAPARSERS[data_config["name"]] = DataParser(data_config["data_dir"])
         data_parser = Define.DATAPARSERS[data_config["name"]]
         with open(data_parser.stats_path) as f:
             stats = json.load(f)
@@ -143,6 +144,14 @@ def main(args, configs):
             result_dir = args.output_path
 
     # Get dataset
+    # TODO: Refactor semi systems and non-semi systems in to same parsing process.
+    # TODO: Separate data_config from preprocess_config.
+    if "semi" in algorithm_config["type"]:
+        config_reader = LanguageDataConfigReader()
+        data_configs = {
+            "sup": [config_reader.read("_data/JSUT/16-shot/task-0")],
+            "unsup": data_configs,
+        }
     datamodule = get_datamodule(algorithm_config["type"])(
         data_configs, train_config, algorithm_config, log_dir, result_dir
     )
@@ -204,7 +213,7 @@ def main(args, configs):
             preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
             log_dir=log_dir, result_dir=result_dir
         )
-        model.tune_init()
+        model.tune_init(config_reader.read("_data/JSUT/16-shot/task-0"))
 
         # Train
         if Define.USE_COMET:

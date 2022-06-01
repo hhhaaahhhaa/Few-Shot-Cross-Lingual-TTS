@@ -5,9 +5,9 @@ from text.define import LANG_ID2SYMBOLS
 from .utils import reprocess
 
 
-class LanguageCollate(object):
+class TextCollate(object):
     """
-    For baseline multilingual FastSpeech2 training.
+    Inference dataset only have text and target speaker information.
     """
     def __init__(self):
         # calculate re-id increment
@@ -34,6 +34,6 @@ class LanguageCollate(object):
         if re_id:
             for idx in idx_arr:
                 data[idx]["text"] += self.re_id_increment[data[idx]["lang_id"]]
-        output = reprocess(data, idx_arr)
+        output = reprocess(data, idx_arr, mode="inference")
 
         return output

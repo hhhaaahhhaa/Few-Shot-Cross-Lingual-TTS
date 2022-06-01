@@ -196,8 +196,8 @@ def read_queries_from_txt(path):
         for line in f.readlines():
             n, s, t, r = line.strip("\n").split("|")
             res.append({
-                "spk": n,
-                "basename": s,
+                "basename": n,
+                "spk": s,
             })
     return res
 
@@ -238,3 +238,5 @@ def generate_reference(path, data_parser: DataParser, lang_id):
         phns = f"{{{phns}}}"  # match input format of text_to_sequence()
         phone = np.array(text_to_sequence(phns, ["basic_cleaners"], lang_id))
         info["texts"].append(phone)
+
+    return info

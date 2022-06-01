@@ -23,11 +23,11 @@ class MultilingualTablePhonemeEmbedding(pl.LightningModule):
     therefore one can utilize it when transfer learning (maybe different number of languages).
     """
     def __init__(self, lang_id2symbols, d_word_vec):
-        super.__init__()
+        super().__init__()
         self.lang_id2symbols = lang_id2symbols
         self.d_word_vec = d_word_vec
 
-        self.tables = nn.ModuleDict()
+        self.tables = nn.ParameterDict()
         for lang_id, v in lang_id2symbols.items():
             if len(v) > 0:
                 w_init = torch.randn(len(v), d_word_vec)
@@ -67,65 +67,65 @@ class MultiHeadAttentionCodebook(pl.LightningModule):
         pass
 
 
-class MultiHeadSelfAttention(pl.LightningModule):
-    """
-    Standard MHSA module.
-    """
-    def __init__(self, dim, head):
-        super().__init__()
-        self.codebook_config = algorithm_config["adapt"]["phoneme_emb"]
-        self.codebook_size = self.codebook_config["size"]
-        self.d_word_vec = model_config["transformer"]["encoder_hidden"]
-        self.num_heads = 4
-        assert self.d_word_vec % self.num_heads == 0
+# class MultiHeadSelfAttention(pl.LightningModule):
+#     """
+#     Standard MHSA module.
+#     """
+#     def __init__(self, dim, head):
+#         super().__init__()
+#         self.codebook_config = algorithm_config["adapt"]["phoneme_emb"]
+#         self.codebook_size = self.codebook_config["size"]
+#         self.d_word_vec = model_config["transformer"]["encoder_hidden"]
+#         self.num_heads = 4
+#         assert self.d_word_vec % self.num_heads == 0
 
-        self.emb_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
+#         self.emb_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
 
-        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            self.weight_raw = nn.Parameter(torch.zeros(1, 1, 25, 1))
+#         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
+#             self.weight_raw = nn.Parameter(torch.zeros(1, 1, 25, 1))
             
-            # specific layer
-            if Define.LAYER_IDX is not None:
-                last_hidden = torch.ones(1, 1, 25, 1) * float('-inf')
-                last_hidden[0][0][Define.LAYER_IDX][0] = 10.0
-                self.weight_raw = nn.Parameter(last_hidden)
-                self.weight_raw.requires_grad = False
+#             # specific layer
+#             if Define.LAYER_IDX is not None:
+#                 last_hidden = torch.ones(1, 1, 25, 1) * float('-inf')
+#                 last_hidden[0][0][Define.LAYER_IDX][0] = 10.0
+#                 self.weight_raw = nn.Parameter(last_hidden)
+#                 self.weight_raw.requires_grad = False
 
-        self.d_feat = Define.UPSTREAM_DIM
-        self.q_linear = nn.Linear(self.d_feat, self.d_word_vec)
+#         self.d_feat = Define.UPSTREAM_DIM
+#         self.q_linear = nn.Linear(self.d_feat, self.d_word_vec)
 
-        # att(feats, att_banks) -> token_id weights -> emb_banks
-        self.att_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
+#         # att(feats, att_banks) -> token_id weights -> emb_banks
+#         self.att_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
 
-        self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
+#         self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
 
-    def get_new_embedding(self, ref, *args, **kwargs):
-        """
-        ref: 
-            Sup: Tensor with size (B=1, vocab_size, 25, representation_dim).
-            Unsup: Tensor with size (B, L, 25, representation_dim).
-        """
-        B = ref.shape[0]
-        try:
-            assert ref.device == self.device
-        except:
-            ref = ref.to(device=self.device)
-        ref[ref != ref] = 0
+#     def get_new_embedding(self, ref, *args, **kwargs):
+#         """
+#         ref: 
+#             Sup: Tensor with size (B=1, vocab_size, 25, representation_dim).
+#             Unsup: Tensor with size (B, L, 25, representation_dim).
+#         """
+#         B = ref.shape[0]
+#         try:
+#             assert ref.device == self.device
+#         except:
+#             ref = ref.to(device=self.device)
+#         ref[ref != ref] = 0
 
-        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
-            weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=2) * ref
-            ref = weighted_sum.sum(dim=2)
-        q = self.q_linear(ref).view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
-        q = q.transpose(1, 2).contiguous()  # B x nH x vocab_size x dword // nH
-        k = self.att_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
-        k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x codebook_size x dword // nH
-        v = self.emb_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
-        v = v.transpose(0, 1).unsqueeze(0).contiguous()
-        weighted_embedding, attn = self.attention(q, k, v)
-        weighted_embedding = weighted_embedding.transpose(1, 2).contiguous().view(B, -1, self.d_word_vec)
-        # print(torch.sum(self.att_banks), torch.sum(self.emb_banks))
+#         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:
+#             weighted_sum = torch.nn.functional.softmax(self.weight_raw, dim=2) * ref
+#             ref = weighted_sum.sum(dim=2)
+#         q = self.q_linear(ref).view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
+#         q = q.transpose(1, 2).contiguous()  # B x nH x vocab_size x dword // nH
+#         k = self.att_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
+#         k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x codebook_size x dword // nH
+#         v = self.emb_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
+#         v = v.transpose(0, 1).unsqueeze(0).contiguous()
+#         weighted_embedding, attn = self.attention(q, k, v)
+#         weighted_embedding = weighted_embedding.transpose(1, 2).contiguous().view(B, -1, self.d_word_vec)
+#         # print(torch.sum(self.att_banks), torch.sum(self.emb_banks))
         
-        return weighted_embedding
+#         return weighted_embedding
 
 
 

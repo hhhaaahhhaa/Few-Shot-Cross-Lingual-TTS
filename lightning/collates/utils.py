@@ -4,36 +4,38 @@ import torch
 from lightning.utils.tool import pad_1D, pad_2D
 
 
-def reprocess(data, idxs):
+def reprocess(data, idxs, mode="sup"):
     """
     Pad data and calculate length of data. Unsupervised version has no text-related data.
+    Inference version has only text and speaker data.
+    Args:
+        mode: "sup", "unsup", or "inference".
     """
-    unsup = False
-    if data[idxs[0]]["text"] is None:
-        unsup = True
     ids = [data[idx]["id"] for idx in idxs]
     speakers = [data[idx]["speaker"] for idx in idxs]
-    if not unsup:
+    speakers = np.array(speakers)
+
+    if mode in ["sup", "inference"]:
         texts = [data[idx]["text"] for idx in idxs]
         raw_texts = [data[idx]["raw_text"] for idx in idxs]
-    mels = [data[idx]["mel"] for idx in idxs]
-    pitches = [data[idx]["pitch"] for idx in idxs]
-    energies = [data[idx]["energy"] for idx in idxs]
-    durations = [data[idx]["duration"] for idx in idxs]
-
-    if not unsup:
         text_lens = np.array([text.shape[0] for text in texts])
-    else:  # Duration has same length with text, which is equal to the number of segments.
-        text_lens = np.array([len(duration) for duration in durations])
-    mel_lens = np.array([mel.shape[0] for mel in mels])
-
-    speakers = np.array(speakers)
-    if not unsup:
         texts = pad_1D(texts)
-    mels = pad_2D(mels)
-    pitches = pad_1D(pitches)
-    energies = pad_1D(energies)
-    durations = pad_1D(durations)
+
+    if mode in ["sup", "unsup"]:
+        mels = [data[idx]["mel"] for idx in idxs]
+        pitches = [data[idx]["pitch"] for idx in idxs]
+        energies = [data[idx]["energy"] for idx in idxs]
+        durations = [data[idx]["duration"] for idx in idxs]
+        mel_lens = np.array([mel.shape[0] for mel in mels])
+
+    if mode in ["unsup"]:  # Duration has same length with text, which is equal to the number of segments.
+        text_lens = np.array([len(duration) for duration in durations])
+
+    if mode in ["sup", "unsup"]:
+        mels = pad_2D(mels)
+        pitches = pad_1D(pitches)
+        energies = pad_1D(energies)
+        durations = pad_1D(durations)
 
     if "spk_ref_mel_slices" in data[0]:
         spk_ref_mels = [data[idx]["spk_ref_mel_slices"] for idx in idxs]
@@ -53,7 +55,7 @@ def reprocess(data, idxs):
     else:
         speaker_args = torch.from_numpy(speakers).long()
 
-    if not unsup:
+    if mode is "sup":
         return (
             ids,
             raw_texts,
@@ -68,8 +70,7 @@ def reprocess(data, idxs):
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
         )
-    
-    else:
+    elif mode is "unsup":
         return (
             ids,
             None,
@@ -84,3 +85,14 @@ def reprocess(data, idxs):
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
         )
+    elif mode is "inference":
+        return (
+            ids,
+            raw_texts,
+            speaker_args,
+            torch.from_numpy(texts).long(),
+            torch.from_numpy(text_lens),
+            max(text_lens),
+        )
+    else:
+        raise NotImplementedError

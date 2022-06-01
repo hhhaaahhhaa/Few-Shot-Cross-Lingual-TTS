@@ -202,7 +202,7 @@ class SpeakerTaskCollate:
         return output
 
 
-class LanguageTaskCollate:
+class LanguageCollate:
     """TaskDataset.task_collate
 
     Task: N spks (N >= 1), 1 way(lang), K shots, Q queries, B batch_size

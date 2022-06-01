@@ -7,12 +7,12 @@ from lightning.utils.tool import torch_exist_nan
 from Parsers.parser import DataParser
 
 
-data_parser = DataParser("/work/u5550322/fscl/LibriTTS")
+data_parser = DataParser("/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/LibriTTS")
 
 
 def go(extractor, ppp):
     batch_size = 1
-    queries = data_parser.get_all_queries()[:10]
+    queries = data_parser.get_all_queries()[:1024]
     wavs = []
     q_temp = []
     n_frames = 0
@@ -51,9 +51,12 @@ def go(extractor, ppp):
 
 
 if __name__ == "__main__":
-    extractor = getattr(hub, 'hubert')().cuda()
+    # extractor = getattr(hub, 'hubert')().cuda()
+    # extractor.eval()
+    # go(extractor, "hubert_layer_norm.pkl")
+    # extractor = getattr(hub, 'wav2vec2')().cuda()
+    # extractor.eval()
+    # go(extractor, "wav2vec2_layer_norm.pkl")
+    extractor = getattr(hub, 'wav2vec')().cuda()
     extractor.eval()
-    go(extractor, "hubert_layer_norm.pkl")
-    extractor = getattr(hub, 'wav2vec2')().cuda()
-    extractor.eval()
-    go(extractor, "wav2vec2_layer_norm.pkl")
+    go(extractor, "wav2vec_layer_norm.pkl")
