@@ -8,6 +8,7 @@ from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
+from lightning.model import get_reference_extractor_cls
 from lightning.callbacks.language.fscl_saver import Saver
 from Objects.visualization import CodebookAnalyzer
 from lightning.model.reference_extractor import HubertExtractor, XLSR53Extractor, Wav2Vec2Extractor, MelExtractor
@@ -23,9 +24,9 @@ class TransEmbSystem(AdaptorSystem):
 
         # tests
         self.codebook_analyzer = CodebookAnalyzer(self.result_dir)
-        self.test_list = {
-            "codebook visualization": self.visualize_matching,
-        }
+        # self.test_list = {
+        #     "codebook visualization": self.visualize_matching,
+        # }
 
     def build_model(self):
         self.embedding_model = PhonemeEmbedding(self.model_config, self.algorithm_config)
@@ -35,16 +36,7 @@ class TransEmbSystem(AdaptorSystem):
         self.vocoder = LightningMelGAN()
         self.vocoder.freeze()
 
-        if Define.UPSTREAM == "hubert":
-            self.reference_extractor = HubertExtractor()
-        elif Define.UPSTREAM == "wav2vec2":
-            self.reference_extractor = Wav2Vec2Extractor()
-        elif Define.UPSTREAM == "xlsr53":
-            self.reference_extractor = XLSR53Extractor()
-        elif Define.UPSTREAM == "mel":
-            self.reference_extractor = MelExtractor()
-        else:
-            raise NotImplementedError
+        self.reference_extractor = get_reference_extractor_cls(Define.UPSTREAM)()
         self.reference_extractor.freeze()
 
     def build_optimized_model(self):
@@ -74,7 +66,9 @@ class TransEmbSystem(AdaptorSystem):
         embedding[Constants.PAD].fill_(0)
 
         if Define.DEBUG:
-            print("Embedding shape ", embedding.shape)
+            print(embedding.requires_grad)
+            print("Embedding shape and gradient required: ", embedding.shape)
+            print(embedding.requires_grad)
         return embedding
 
     def common_step(self, batch, batch_idx, train=True):
@@ -109,22 +103,18 @@ class TransEmbSystem(AdaptorSystem):
     
     def visualize_matching(self, batch, batch_idx):
         if self.codebook_type != "table-sep":
-            _, _, ref_phn_feats, lang_id = batch[0]
+            _, _, repr_info, lang_id = batch[0]
             with torch.no_grad():
-                ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
-                ref_phn_feats = ref_phn_feats.squeeze(0)
-                ref_phn_feats[Constants.PAD].fill_(0)
-
+                ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
             matching = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
             self.codebook_analyzer.visualize_matching(batch_idx, matching)
         return None
 
     def log_matching(self, batch, batch_idx, stage="val"):
         step = self.global_step + 1
-        _, _, ref_phn_feats, lang_id = batch[0]
+        _, _, repr_info, lang_id = batch[0]
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(ref_phn_feats, norm=False)
-            ref_phn_feats[0][Constants.PAD].fill_(0)
+            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
         
         matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
         for matching in matchings:

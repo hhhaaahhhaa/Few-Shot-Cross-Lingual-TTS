@@ -48,14 +48,14 @@ class FSCLDataModule(pl.LightningDataModule):
                 FSCLDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=True, drop_last=True, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
                 FSCLDataset(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, sort=False, drop_last=False, spk_refer_wav=spk_refer_wav
+                    data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'val' in data_config['subsets']
             ]
             self.train_dataset = ConcatDataset(self.train_datasets)
@@ -102,7 +102,7 @@ class FSCLDataModule(pl.LightningDataModule):
             self.train_task_dataset,
             batch_size=1,
             shuffle=True,
-            num_workers=4,
+            num_workers=Define.MAX_WORKERS,
             collate_fn=lambda batch: batch,
         )
         return self.train_loader
@@ -191,7 +191,7 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=True,
             drop_last=True,
-            num_workers=4,
+            num_workers=Define.MAX_WORKERS,
             collate_fn=self.collate.collate_fn(False),
         )
         return self.train_loader

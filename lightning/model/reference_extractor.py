@@ -14,6 +14,8 @@ class S3PRLExtractor(pl.LightningModule):
     def __init__(self, name):
         super().__init__()
         self.ssl_extractor = getattr(hub, name)()
+        # self.repr_reduction = AverageReprModule()
+        self.repr_reduction = RandomSelectReprModule()
 
     # def extract_numpy(self, wav):
     #     wav = torch.from_numpy(wav).float().cuda()
@@ -53,6 +55,7 @@ class S3PRLExtractor(pl.LightningModule):
                 unsup_repr.append(repr.transpose(0, 1))
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, layer, dim
             if Define.DEBUG:
+                self.log("Pseudo phoneme-level average representations shape:")
                 self.log(unsup_repr.shape)
             return unsup_repr.to(self.device)
         else:
@@ -65,22 +68,30 @@ class S3PRLExtractor(pl.LightningModule):
                 for i, (t, d) in enumerate(zip(text, d_list)):
                     if d > 0:
                         if not torch_exist_nan(repr[:, pos: pos + d, :]):
-                            table[int(t)].append(repr[:, pos: pos + d, :].mean(dim=1, keepdim=True))
+                            table[int(t)].append(repr[:, pos: pos + d, :].mean(dim=1))
                         else:
                             print("oh, so bad...")
                     pos += d
 
-            phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM), dtype=float)
-            for i in range(n_symbols):
-                if len(table[i]) == 0:
-                    phn_repr[i] = torch.zeros((Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM))
-                else:
-                    phn_repr[i] = torch.mean(torch.cat(table[i], axis=1), axis=1)
+            # phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM), dtype=float)
+            # for i in range(n_symbols):
+            #     if len(table[i]) == 0:
+            #         phn_repr[i] = torch.zeros((Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM))
+            #     else:
+            #         phn_repr[i] = torch.mean(torch.cat(table[i], axis=1), axis=1)
 
-            phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
+            # phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
+            # if Define.DEBUG:
+            #     self.log("Phoneme-level average representations shape:")
+            #     self.log(phn_repr.shape)
+            # return phn_repr.to(self.device)
+
+            phn_repr = self.repr_reduction(n_symbols, table, (Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM))
+            phn_repr = phn_repr.unsqueeze(0)  # 1, n_symbols, layer, dim
             if Define.DEBUG:
+                self.log("Phoneme-level average representations shape:")
                 self.log(phn_repr.shape)
-            return phn_repr.to(self.device)
+            return phn_repr
 
     def log(self, msg):
         print("[SSL reference extractor]: ", msg)
@@ -104,9 +115,11 @@ class XLSR53Extractor(S3PRLExtractor):
 class MelExtractor(pl.LightningModule):
     def __init__(self):
         super().__init__()
+        # self.repr_reduction = AverageReprModule()
+        self.repr_reduction = RandomSelectReprModule()
 
     def extract(self, info, norm=False, no_text=False):
-        representation_list = [w for w in info["raw-feat"]]
+        representation_list = [w.detach().cpu() for w in info["raw-feat"]]
         avg_frames = info["avg-frames"]
 
         if no_text:
@@ -123,8 +136,9 @@ class MelExtractor(pl.LightningModule):
                 repr = repr[:len(d_list)]
                 unsup_repr.append(repr)
             unsup_repr = torch.nn.utils.rnn.pad_sequence(unsup_repr, batch_first=True)  # B, L, 80
-            # if Define.DEBUG:
-            #     self.log(unsup_repr.shape)
+            if Define.DEBUG:
+                self.log("Pseudo phoneme-level average representations shape:")
+                self.log(unsup_repr.shape)
             return unsup_repr
         else:
             lang_id = info["lang_id"]
@@ -137,25 +151,92 @@ class MelExtractor(pl.LightningModule):
                 for i, (t, d) in enumerate(zip(text, d_list)):
                     if d > 0:
                         if not torch_exist_nan(repr[pos: pos + d, :]):
-                            table[int(t)].append(repr[pos: pos + d, :].mean(dim=0, keepdim=True))
+                            table[int(t)].append(repr[pos: pos + d, :].mean(dim=0))
                         else:
                             print("oh, so bad...")
                     pos += d
 
-            phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_DIM), dtype=float)
-            for i in range(n_symbols):
-                if len(table[i]) == 0:
-                    phn_repr[i] = torch.zeros(Define.UPSTREAM_DIM)
-                else:
-                    phn_repr[i] = torch.mean(torch.cat(table[i], axis=0), axis=0)
+            # phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_DIM), dtype=float)
+            # for i in range(n_symbols):
+            #     if len(table[i]) == 0:
+            #         phn_repr[i] = torch.zeros(Define.UPSTREAM_DIM)
+            #     else:
+            #         phn_repr[i] = torch.mean(torch.cat(table[i], axis=0), axis=0)
 
-            phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
+            # phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
             # if Define.DEBUG:
+            #     self.log("Phoneme-level average representations shape:")
             #     self.log(phn_repr.shape)
+            # return phn_repr
+
+            phn_repr = self.repr_reduction(n_symbols, table, (Define.UPSTREAM_DIM))
+            phn_repr = phn_repr.unsqueeze(0)  # 1, n_symbols, 80
+            if Define.DEBUG:
+                self.log("Phoneme-level average representations shape:")
+                self.log(phn_repr.shape)
             return phn_repr
 
     def log(self, msg):
         print("[Mel reference extractor]: ", msg)
+
+
+class AverageReprModule(pl.LightningModule):
+    """
+    Given K class labels and some representations, average representations classwise.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, n_class, table, repr_shape):
+        """
+        Args:
+            n_class: Total number of classes.
+            table: Dictionary with class label as key and list of representations belong to the
+                label as value.
+            repr_shape: Shape of single representation.
+        Return:
+            Tensor with shape (n_class, *repr_shape).
+        """
+        avg_repr = []
+        for i in range(n_class):
+            if len(table[i]) == 0:
+                avg_repr.append(torch.zeros(repr_shape))
+            else:
+                avg_repr.append(torch.mean(torch.stack(table[i], axis=0), axis=0))
+        avg_repr = torch.stack(avg_repr, dim=0).float()
+
+        return avg_repr.to(self.device)
+
+
+import random
+class RandomSelectReprModule(pl.LightningModule):
+    """
+    Given K class labels and some representations, random select one representation for each class.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, n_class, table, repr_shape):
+        """
+        Args:
+            n_class: Total number of classes.
+            table: Dictionary with class label as key and list of representations belong to the
+                label as value.
+            repr_shape: Shape of single representation.
+        Return:
+            Tensor with shape (n_class, *repr_shape).
+        """
+        selected_repr = []
+        for i in range(n_class):
+            if len(table[i]) == 0:
+                selected_repr.append(torch.zeros(repr_shape))
+            else:
+                idx = random.randint(0, len(table[i]) - 1)
+                selected_repr.append(table[i][idx])
+            # print(selected_repr[-1].is_cuda)  # this should always be false
+        selected_repr = torch.stack(selected_repr, dim=0).float()
+
+        return selected_repr.to(self.device)
 
 
 if __name__ == "__main__":

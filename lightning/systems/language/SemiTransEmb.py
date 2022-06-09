@@ -9,6 +9,7 @@ from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
+from lightning.model import get_reference_extractor_cls
 from lightning.callbacks.language.fscl_saver import Saver
 from lightning.callbacks import GlobalProgressBar
 from Objects.visualization import CodebookAnalyzer
@@ -37,16 +38,7 @@ class SemiTransEmbSystem(AdaptorSystem):
         self.vocoder = LightningMelGAN()
         self.vocoder.freeze()
 
-        if Define.UPSTREAM == "hubert":
-            self.reference_extractor = HubertExtractor()
-        elif Define.UPSTREAM == "wav2vec2":
-            self.reference_extractor = Wav2Vec2Extractor()
-        elif Define.UPSTREAM == "xlsr53":
-            self.reference_extractor = XLSR53Extractor()
-        elif Define.UPSTREAM == "mel":
-            self.reference_extractor = MelExtractor()
-        else:
-            raise NotImplementedError
+        self.reference_extractor = get_reference_extractor_cls(Define.UPSTREAM)()
         self.reference_extractor.freeze()
 
     def build_optimized_model(self):

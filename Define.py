@@ -4,14 +4,16 @@ import json
 
 
 LOCAL = True
-DEBUG = False
+DEBUG = True
 CUDA_LAUNCH_BLOCKING = False
+MAX_WORKERS = 4
 DATAPARSERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 if LOCAL:
     CUDA_LAUNCH_BLOCKING = True  # TODO: Always crash on my PC if false
+    MAX_WORKERS = 2
 
 
 def merge_stats(stats_dict, keys):
@@ -35,7 +37,7 @@ def merge_stats(stats_dict, keys):
 
 
 # Experiment parameters
-USE_COMET = False
+USE_COMET = True
 EXP_IDX = 0
 UPSTREAM = "mel"
 UPSTREAM_DIM = 80

@@ -118,6 +118,7 @@ class UnsupFSCLDataset(Dataset):
     Unsupervised version of FSCLDataset.
     """
     def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False):
+        self.oracle = True  # Assume oracle perfect segmentation
         self.data_parser = data_parser
         self.spk_refer_wav = spk_refer_wav
 
@@ -141,9 +142,15 @@ class UnsupFSCLDataset(Dataset):
         }
 
         mel = self.data_parser.mel.read_from_query(query)
-        pitch = self.data_parser.unsup_duration_avg_pitch.read_from_query(query)
-        energy = self.data_parser.unsup_duration_avg_energy.read_from_query(query)
-        duration = self.data_parser.unsup_duration.read_from_query(query)
+        if not self.oracle:
+            pitch = self.data_parser.unsup_duration_avg_pitch.read_from_query(query)
+            energy = self.data_parser.unsup_duration_avg_energy.read_from_query(query)
+            duration = self.data_parser.unsup_duration.read_from_query(query)
+        else:  # Oracle perfect segmentation
+            pitch = self.data_parser.mfa_duration_avg_pitch.read_from_query(query)
+            energy = self.data_parser.mfa_duration_avg_energy.read_from_query(query)
+            duration = self.data_parser.mfa_duration.read_from_query(query)
+
         mel = np.transpose(mel[:, :sum(duration)])
 
         _, _, global_pitch_mu, global_pitch_std, _, _, global_energy_mu, global_energy_std = Define.ALLSTATS["global"]
@@ -171,10 +178,16 @@ class UnsupFSCLDataset(Dataset):
             sample.update({"spk_ref_mel_slices": spk_ref_mel_slices})
 
         # For codebook module
-        segment = self.data_parser.unsup_segment.read_from_query(query)
+        if not self.oracle:
+            segment = self.data_parser.unsup_segment.read_from_query(query)
+        else:
+            segment = self.data_parser.mfa_segment.read_from_query(query)
         if Define.UPSTREAM == "mel":
             raw_feat = mel
-            avg_frames = self.data_parser.unsup_duration.read_from_query(query)
+            if not self.oracle:
+                avg_frames = self.data_parser.unsup_duration.read_from_query(query)
+            else:
+                avg_frames = self.data_parser.mfa_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
             avg_frames = []

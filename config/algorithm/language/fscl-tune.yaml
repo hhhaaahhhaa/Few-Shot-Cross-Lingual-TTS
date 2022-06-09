@@ -1,5 +1,5 @@
-name: semi-fscl-tune
-type: semi-fscl-tune
+name: fscl-tune
+type: fscl-tune
 
 _phn_emb_config:
   embedding: &embedding

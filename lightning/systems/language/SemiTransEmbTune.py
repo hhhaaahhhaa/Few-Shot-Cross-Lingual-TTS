@@ -75,7 +75,7 @@ class SemiTransEmbTuneSystem(System):
         self.reference_extractor.cuda()
 
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False, batch_size=16)
             embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=self.lang_id)
             embedding = embedding.squeeze(0)
             embedding.requires_grad = True
@@ -89,8 +89,8 @@ class SemiTransEmbTuneSystem(System):
         print("Generate reference done.")
 
         # tune partial model
-        # for p in self.emb_layer.parameters():
-        #     p.requires_grad = False
+        for p in self.emb_layer.parameters():
+            p.requires_grad = False
         # for p in self.model.encoder.parameters():
         #     p.requires_grad = False
         # for p in self.model.variance_adaptor.parameters():
@@ -110,6 +110,9 @@ class SemiTransEmbTuneSystem(System):
     def u_common_step(self, u_batch, batch_idx, train=True):
         # unsupervised loss
         u_batch_data, u_repr_info = u_batch
+        if Define.DEBUG:
+            print("Check IDs:")
+            print(u_batch_data[0])
         unsup_repr = self.get_unsup_representation(u_repr_info)
         u_output = self.model(u_batch_data[2], unsup_repr, *(u_batch_data[4:]))
         u_loss = self.loss_func(u_batch_data, u_output)
@@ -165,8 +168,11 @@ class SemiTransEmbTuneSystem(System):
         s_train_loss, predictions = self.s_common_step(batch["sup"], batch_idx, train=True)
         u_train_loss = self.u_common_step(batch["unsup"], batch_idx, train=True)
         train_loss = []
+        if Define.DEBUG:
+            print("Sup/Unsup training loss:")
+            print(s_train_loss[0], u_train_loss[0])
         for i in range(len(s_train_loss)):
-            train_loss.append(0.5 * s_train_loss[i] + 0.5 * u_train_loss[i])
+            train_loss.append(1.0 * s_train_loss[i] + 0.0 * u_train_loss[i])
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}

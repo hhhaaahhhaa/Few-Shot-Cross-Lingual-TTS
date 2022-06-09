@@ -149,6 +149,7 @@ def main(args, configs):
     if "semi" in algorithm_config["type"]:
         config_reader = LanguageDataConfigReader()
         data_configs = {
+            # "sup": data_configs,
             "sup": [config_reader.read("_data/JSUT/16-shot/task-0")],
             "unsup": data_configs,
         }
@@ -213,7 +214,11 @@ def main(args, configs):
             preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
             log_dir=log_dir, result_dir=result_dir
         )
-        model.tune_init(config_reader.read("_data/JSUT/16-shot/task-0"))
+        if "semi" in algorithm_config["type"]:
+            # model.tune_init(data_configs["sup"][0])
+            model.tune_init(config_reader.read("_data/JSUT/16-shot/task-0"))
+        else:
+            pass
 
         # Train
         if Define.USE_COMET:

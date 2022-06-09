@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import numpy as np
 import pytorch_lightning as pl
 import random
+from tqdm import tqdm
 from contextlib import contextmanager
 import matplotlib
 from matplotlib import pyplot as plt
@@ -212,8 +213,8 @@ def generate_reference(path, data_parser: DataParser, lang_id):
         "raw-feat": [],
         "texts": [],
     }
-    queries = read_queries_from_txt(path)
-    for query in queries:
+    queries = read_queries_from_txt(path)[:64]
+    for query in tqdm(queries):
         if Define.UPSTREAM == "mel":
             duration = data_parser.mfa_duration.read_from_query(query)
             info["avg-frames"].append(duration)

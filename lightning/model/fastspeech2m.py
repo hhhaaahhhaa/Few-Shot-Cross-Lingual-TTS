@@ -58,9 +58,9 @@ class FastSpeech2(pl.LightningModule):
             else None
         )
 
-        if Define.DEBUG:
-            print("FastSpeech2m input shape: ", texts.shape)
-            print("FastSpeech2m mask shape: ", src_masks.shape)
+        # if Define.DEBUG:
+        #     print("FastSpeech2m input shape: ", texts.shape)
+        #     print("FastSpeech2m mask shape: ", src_masks.shape)
         output = self.encoder(texts, src_masks)
 
         if self.speaker_emb is not None:
