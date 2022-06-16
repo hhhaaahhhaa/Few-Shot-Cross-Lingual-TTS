@@ -66,7 +66,6 @@ class TransEmbSystem(AdaptorSystem):
         embedding[Constants.PAD].fill_(0)
 
         if Define.DEBUG:
-            print(embedding.requires_grad)
             print("Embedding shape and gradient required: ", embedding.shape)
             print(embedding.requires_grad)
         return embedding

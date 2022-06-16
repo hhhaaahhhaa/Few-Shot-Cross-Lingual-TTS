@@ -101,7 +101,7 @@ class SemiTransEmbTuneSystem(System):
     def get_unsup_representation(self, repr_info):
         with torch.no_grad():
             unsup_repr = self.reference_extractor.extract(repr_info, norm=False, no_text=True)
-        unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
+            unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
 
         if Define.DEBUG:
             print("Unsup Representation shape ", unsup_repr.shape)
@@ -118,6 +118,44 @@ class SemiTransEmbTuneSystem(System):
         u_loss = self.loss_func(u_batch_data, u_output)
 
         return u_loss
+
+    def uq_common_step(self, u_batch, batch_idx, train=True):
+        """
+        Variant of u_common_step which performs quantization to match supervised distribution
+        """
+        # unsupervised loss
+        sup_table = self.emb_layer.get_new_embedding(lang_id=self.lang_id)
+        nonzero_idxs = sup_table.sum(dim=1) != 0
+        sup_table_filtered = sup_table[nonzero_idxs]
+        
+        u_batch_data, u_repr_info = u_batch
+        if Define.DEBUG:
+            print("Check IDs:")
+            print(u_batch_data[0])
+        unsup_repr = self.get_unsup_representation(u_repr_info)
+
+        # Quantize to match supervised distribution
+        with torch.no_grad():
+            unsup_repr_quantize = self.similarity_quantize(unsup_repr, sup_table_filtered)
+
+        u_output = self.model(u_batch_data[2], unsup_repr_quantize, *(u_batch_data[4:]))
+        u_loss = self.loss_func(u_batch_data, u_output)
+
+        return u_loss
+
+    def similarity_quantize(self, unsup_repr, sup_table):
+        """
+        Args:
+            unsup_repr: Tensor with shape (B, L, dim)
+            sup_table: Tensor with shape (n_occurred_symbols, dim)
+        """
+        diff = (unsup_repr.unsqueeze(2) - sup_table.unsqueeze(0).unsqueeze(0)) ** 2  # B, L, n_occurred_symbols, dim 
+        dist = torch.sum(diff, dim=3)  # B, L, n_occurred_symbols
+        q_result = dist.argmax(2)  # B, L
+        q_mat = torch.zeros(dist.shape).scatter(2, q_result.unsqueeze(2), 1.0)  # B, L, n_occurred_symbols
+        unsup_repr_quantize = q_mat @ sup_table.unsqueeze(0).unsqueeze(0)  # B, L, dim
+
+        return unsup_repr_quantize
     
     def s_common_step(self, s_batch, batch_idx, train=True):
         # print(self.emb_layer._parameters['weight'].requires_grad)

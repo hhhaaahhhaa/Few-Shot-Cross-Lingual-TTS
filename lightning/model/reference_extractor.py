@@ -73,19 +73,6 @@ class S3PRLExtractor(pl.LightningModule):
                             print("oh, so bad...")
                     pos += d
 
-            # phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM), dtype=float)
-            # for i in range(n_symbols):
-            #     if len(table[i]) == 0:
-            #         phn_repr[i] = torch.zeros((Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM))
-            #     else:
-            #         phn_repr[i] = torch.mean(torch.cat(table[i], axis=1), axis=1)
-
-            # phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, layer, dim
-            # if Define.DEBUG:
-            #     self.log("Phoneme-level average representations shape:")
-            #     self.log(phn_repr.shape)
-            # return phn_repr.to(self.device)
-
             phn_repr = self.repr_reduction(n_symbols, table, (Define.UPSTREAM_LAYER, Define.UPSTREAM_DIM))
             phn_repr = phn_repr.unsqueeze(0)  # 1, n_symbols, layer, dim
             if Define.DEBUG:
@@ -156,19 +143,6 @@ class MelExtractor(pl.LightningModule):
                             print("oh, so bad...")
                     pos += d
 
-            # phn_repr = torch.zeros((n_symbols, Define.UPSTREAM_DIM), dtype=float)
-            # for i in range(n_symbols):
-            #     if len(table[i]) == 0:
-            #         phn_repr[i] = torch.zeros(Define.UPSTREAM_DIM)
-            #     else:
-            #         phn_repr[i] = torch.mean(torch.cat(table[i], axis=0), axis=0)
-
-            # phn_repr = phn_repr.unsqueeze(0).float()  # 1, n_symbols, 80
-            # if Define.DEBUG:
-            #     self.log("Phoneme-level average representations shape:")
-            #     self.log(phn_repr.shape)
-            # return phn_repr
-
             phn_repr = self.repr_reduction(n_symbols, table, (Define.UPSTREAM_DIM))
             phn_repr = phn_repr.unsqueeze(0)  # 1, n_symbols, 80
             if Define.DEBUG:
@@ -212,6 +186,37 @@ import random
 class RandomSelectReprModule(pl.LightningModule):
     """
     Given K class labels and some representations, random select one representation for each class.
+    """
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, n_class, table, repr_shape):
+        """
+        Args:
+            n_class: Total number of classes.
+            table: Dictionary with class label as key and list of representations belong to the
+                label as value.
+            repr_shape: Shape of single representation.
+        Return:
+            Tensor with shape (n_class, *repr_shape).
+        """
+        selected_repr = []
+        for i in range(n_class):
+            if len(table[i]) == 0:
+                selected_repr.append(torch.zeros(repr_shape))
+            else:
+                idx = random.randint(0, len(table[i]) - 1)
+                selected_repr.append(table[i][idx])
+            # print(selected_repr[-1].is_cuda)  # this should always be false
+        selected_repr = torch.stack(selected_repr, dim=0).float()
+
+        return selected_repr.to(self.device)
+
+
+class PoolReprModule(pl.LightningModule):
+    """
+    Given K class labels and some representations, pool one representation for each class.
+    A representation pool is maintained.
     """
     def __init__(self):
         super().__init__()

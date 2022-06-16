@@ -55,7 +55,7 @@ def reprocess(data, idxs, mode="sup"):
     else:
         speaker_args = torch.from_numpy(speakers).long()
 
-    if mode is "sup":
+    if mode == "sup":
         return (
             ids,
             raw_texts,
@@ -70,7 +70,7 @@ def reprocess(data, idxs, mode="sup"):
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
         )
-    elif mode is "unsup":
+    elif mode == "unsup":
         return (
             ids,
             None,
@@ -85,7 +85,7 @@ def reprocess(data, idxs, mode="sup"):
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
         )
-    elif mode is "inference":
+    elif mode == "inference":
         return (
             ids,
             raw_texts,
