@@ -118,7 +118,7 @@ class UnsupFSCLDataset(Dataset):
     Unsupervised version of FSCLDataset.
     """
     def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False):
-        self.oracle = True  # Assume oracle perfect segmentation
+        self.oracle = False  # Assume oracle perfect segmentation, will soon be replaced by FSCLDataset.
         self.data_parser = data_parser
         self.spk_refer_wav = spk_refer_wav
 

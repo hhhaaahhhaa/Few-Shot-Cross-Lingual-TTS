@@ -6,7 +6,7 @@ import Define
 from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, TextDataset, few_shot_task_dataset
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
-from lightning.collates import UnsupFSCLCollate
+from lightning.collates import GeneralFSCLCollate
 from .FastSpeech2DataModule import FastSpeech2DataModule
 
 
@@ -130,10 +130,10 @@ class FSCLDataModule(pl.LightningDataModule):
         return self.test_loader
 
 
-class UnsupFSCLDataModule(pl.LightningDataModule):
+class SupFSCLDataModule(pl.LightningDataModule):
     """
-    Train: UnsupFSCLDataset + UnsupFSCLCollate.
-    Val: UnsupFSCLDataset + UnsupFSCLCollate.
+    Train: FSCLDataset + GeneralFSCLCollate (sup).
+    Val: FSCLDataset + GeneralFSCLCollate (sup).
     Test: None.
     """
     def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
@@ -146,7 +146,86 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
         self.result_dir = result_dir
         self.val_step = self.train_config["step"]["val_step"]
 
-        self.collate = UnsupFSCLCollate()
+        self.collate = GeneralFSCLCollate()
+
+    def setup(self, stage=None):
+        spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
+                     in ["dvec", "encoder", "scratch_encoder"])
+
+        if stage in (None, 'fit', 'validate'):
+            self.train_datasets = [
+                FSCLDataset(
+                    data_config['subsets']['train'],
+                    Define.DATAPARSERS[data_config["name"]],
+                    data_config, spk_refer_wav=spk_refer_wav
+                ) for data_config in self.data_configs if 'train' in data_config['subsets']
+            ]
+            self.val_datasets = [
+                FSCLDataset(
+                    data_config['subsets']['val'],
+                    Define.DATAPARSERS[data_config["name"]],
+                    data_config, spk_refer_wav=spk_refer_wav
+                ) for data_config in self.data_configs if 'val' in data_config['subsets']
+            ]
+            self.train_dataset = ConcatDataset(self.train_datasets)
+            self.val_dataset = ConcatDataset(self.val_datasets)
+            self._train_setup()
+            self._validation_setup()
+
+        if stage in (None, 'test', 'predict'):
+            pass
+
+    def _train_setup(self):
+        if not isinstance(self.train_dataset, EpisodicInfiniteWrapper):
+            # self.batch_size = self.train_ways * (self.train_shots + self.train_queries) * self.meta_batch_size
+            self.batch_size = self.train_config["optimizer"]["batch_size"]
+            self.train_dataset = EpisodicInfiniteWrapper(self.train_dataset, self.val_step*self.batch_size)
+
+    def _validation_setup(self):
+        pass
+
+    def train_dataloader(self):
+        """Training dataloader, not modified for multiple dataloaders."""
+        self.train_loader = DataLoader(
+            self.train_dataset,
+            batch_size=self.batch_size//torch.cuda.device_count(),
+            shuffle=True,
+            drop_last=True,
+            num_workers=Define.MAX_WORKERS,
+            collate_fn=self.collate.collate_fn(sort=False, mode="sup"),
+        )
+        return self.train_loader
+
+    def val_dataloader(self):
+        """Validation dataloader, not modified for multiple dataloaders."""
+        self.val_loader = DataLoader(
+            self.val_dataset,
+            batch_size=self.batch_size//torch.cuda.device_count(),
+            shuffle=False,
+            drop_last=False,
+            num_workers=0,
+            collate_fn=self.collate.collate_fn(sort=False, mode="sup"),
+        )
+        return self.val_loader
+
+
+class UnsupFSCLDataModule(pl.LightningDataModule):
+    """
+    Train: UnsupFSCLDataset + GeneralFSCLCollate (unsup).
+    Val: UnsupFSCLDataset + GeneralFSCLCollate (unsup).
+    Test: None.
+    """
+    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+        super().__init__()
+        self.data_configs = data_configs
+        self.train_config = train_config
+        self.algorithm_config = algorithm_config
+
+        self.log_dir = log_dir
+        self.result_dir = result_dir
+        self.val_step = self.train_config["step"]["val_step"]
+
+        self.collate = GeneralFSCLCollate()
 
     def setup(self, stage=None):
         spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
@@ -192,7 +271,7 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
             shuffle=True,
             drop_last=True,
             num_workers=Define.MAX_WORKERS,
-            collate_fn=self.collate.collate_fn(False),
+            collate_fn=self.collate.collate_fn(sort=False, mode="unsup"),
         )
         return self.train_loader
 
@@ -204,7 +283,7 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=0,
-            collate_fn=self.collate.collate_fn(False),
+            collate_fn=self.collate.collate_fn(sort=False, mode="unsup"),
         )
         return self.val_loader
 
@@ -249,7 +328,11 @@ class SemiFSCLTuneDataModule(pl.LightningDataModule):
         self.sup_datamodule = FastSpeech2DataModule(data_configs["sup"], 
                                                 train_config, algorithm_config, log_dir, result_dir)
         self.sup_datamodule.re_id = False
-        self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
+        # self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
+        #                                         train_config, algorithm_config, log_dir, result_dir)
+        
+        # Oracle
+        self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
                                                 train_config, algorithm_config, log_dir, result_dir)
 
     def setup(self, stage=None):

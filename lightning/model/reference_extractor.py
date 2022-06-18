@@ -14,8 +14,8 @@ class S3PRLExtractor(pl.LightningModule):
     def __init__(self, name):
         super().__init__()
         self.ssl_extractor = getattr(hub, name)()
-        # self.repr_reduction = AverageReprModule()
-        self.repr_reduction = RandomSelectReprModule()
+        self.repr_reduction = AverageReprModule()
+        # self.repr_reduction = RandomSelectReprModule()
 
     # def extract_numpy(self, wav):
     #     wav = torch.from_numpy(wav).float().cuda()
@@ -102,8 +102,8 @@ class XLSR53Extractor(S3PRLExtractor):
 class MelExtractor(pl.LightningModule):
     def __init__(self):
         super().__init__()
-        # self.repr_reduction = AverageReprModule()
-        self.repr_reduction = RandomSelectReprModule()
+        self.repr_reduction = AverageReprModule()
+        # self.repr_reduction = RandomSelectReprModule()
 
     def extract(self, info, norm=False, no_text=False):
         representation_list = [w.detach().cpu() for w in info["raw-feat"]]

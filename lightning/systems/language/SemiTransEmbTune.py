@@ -76,6 +76,10 @@ class SemiTransEmbTuneSystem(System):
 
         with torch.no_grad():
             ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False, batch_size=16)
+            self.used_phn_idxs = (ref_phn_feats.sum(dim=[0, 2, 3]) != 0)
+            if Define.DEBUG:
+                print("Phoneme usage:")
+                print(self.used_phn_idxs)
             embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=self.lang_id)
             embedding = embedding.squeeze(0)
             embedding.requires_grad = True
@@ -98,15 +102,6 @@ class SemiTransEmbTuneSystem(System):
         # for p in self.model.decoder.parameters():
         #     p.requires_grad = False
 
-    def get_unsup_representation(self, repr_info):
-        with torch.no_grad():
-            unsup_repr = self.reference_extractor.extract(repr_info, norm=False, no_text=True)
-            unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
-
-        if Define.DEBUG:
-            print("Unsup Representation shape ", unsup_repr.shape)
-        return unsup_repr
-
     def u_common_step(self, u_batch, batch_idx, train=True):
         # unsupervised loss
         u_batch_data, u_repr_info = u_batch
@@ -118,15 +113,62 @@ class SemiTransEmbTuneSystem(System):
         u_loss = self.loss_func(u_batch_data, u_output)
 
         return u_loss
+    
+    def get_unsup_representation(self, repr_info, norm=False, no_text=True):
+        with torch.no_grad():
+            unsup_repr = self.reference_extractor.extract(repr_info, norm=norm, no_text=no_text)
+            unsup_repr = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_repr)
+
+        if Define.DEBUG:
+            print("Unsup Representation shape ", unsup_repr.shape)
+        return unsup_repr
+    
+    def u_fix_table_common_step(self, u_batch, batch_idx, train=True):
+        """
+        Variant of u_common_step with fix embedding table averaged from the whole dataset.
+        This code is for experiment only, manually set a path inside the code block.
+        """
+        import numpy as np
+        table_path = "?.npy"
+        emb_table = torch.from_numpy(np.load(table_path)).to(self.device)
+
+        u_batch_data, u_repr_info = u_batch
+        emb_texts = F.embedding(u_batch_data[3], emb_table, padding_idx=0)
+        u_output = self.model(u_batch_data[2], emb_texts, *(u_batch_data[4:]))
+        u_loss = self.loss_func(u_batch_data, u_output)
+
+        return u_loss
+
+    def u_avg_common_step(self, u_batch, batch_idx, train=True):
+        """
+        Variant of u_common_step with dynamic embedding table averaged from current batch.
+        """
+        u_batch_data, u_repr_info = u_batch
+        with torch.no_grad():
+            emb_table = self.build_embedding_table(u_repr_info)
+            emb_texts = F.embedding(u_batch_data[3], emb_table, padding_idx=0)
+        u_output = self.model(u_batch_data[2], emb_texts, *(u_batch_data[4:]))
+        u_loss = self.loss_func(u_batch_data, u_output)
+
+        return u_loss
+
+    def build_embedding_table(self, repr_info, norm=False, no_text=False):
+        with torch.no_grad():
+            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=norm, no_text=no_text)
+        embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats)
+        embedding = embedding.squeeze(0)
+        embedding[Constants.PAD].fill_(0)
+
+        if Define.DEBUG:
+            print("Embedding shape ", embedding.shape)
+        return embedding
 
     def uq_common_step(self, u_batch, batch_idx, train=True):
         """
-        Variant of u_common_step which performs quantization to match supervised distribution
+        Variant of u_common_step which performs quantization to match supervised distribution.
         """
         # unsupervised loss
-        sup_table = self.emb_layer.get_new_embedding(lang_id=self.lang_id)
-        nonzero_idxs = sup_table.sum(dim=1) != 0
-        sup_table_filtered = sup_table[nonzero_idxs]
+        emb_table = self.emb_layer.get_new_embedding(lang_id=self.lang_id)
         
         u_batch_data, u_repr_info = u_batch
         if Define.DEBUG:
@@ -136,26 +178,42 @@ class SemiTransEmbTuneSystem(System):
 
         # Quantize to match supervised distribution
         with torch.no_grad():
-            unsup_repr_quantize = self.similarity_quantize(unsup_repr, sup_table_filtered)
-
+            """
+            Quantization / Semi-supervised ASR
+            """
+            pseudo_idxs = self.l2_quantize(unsup_repr, emb_table)
+            if Define.DEBUG:
+                print("Pseudo index:")
+                list_idxs = pseudo_idxs.detach().cpu().tolist()
+                print(list_idxs)
+                for list_idx in list_idxs:
+                    idx_sum = 0
+                    for idx in list_idx:
+                        idx_sum += idx
+                        if idx < 0 or idx > 53 or idx == 13 or idx == 14:
+                            print("wtf happening")
+                            assert 1 == 2
+                    if idx_sum == 0:
+                        print("wtf happening")
+                        assert 1 == 2
+        unsup_repr_quantize = F.embedding(pseudo_idxs, emb_table, padding_idx=0)
         u_output = self.model(u_batch_data[2], unsup_repr_quantize, *(u_batch_data[4:]))
         u_loss = self.loss_func(u_batch_data, u_output)
 
         return u_loss
 
-    def similarity_quantize(self, unsup_repr, sup_table):
+    def l2_quantize(self, unsup_repr, sup_table):
         """
         Args:
             unsup_repr: Tensor with shape (B, L, dim)
-            sup_table: Tensor with shape (n_occurred_symbols, dim)
+            sup_table: Tensor with shape (n_symbols, dim)
         """
-        diff = (unsup_repr.unsqueeze(2) - sup_table.unsqueeze(0).unsqueeze(0)) ** 2  # B, L, n_occurred_symbols, dim 
-        dist = torch.sum(diff, dim=3)  # B, L, n_occurred_symbols
-        q_result = dist.argmax(2)  # B, L
-        q_mat = torch.zeros(dist.shape).scatter(2, q_result.unsqueeze(2), 1.0)  # B, L, n_occurred_symbols
-        unsup_repr_quantize = q_mat @ sup_table.unsqueeze(0).unsqueeze(0)  # B, L, dim
+        diff = (unsup_repr.unsqueeze(2) - sup_table.unsqueeze(0).unsqueeze(0)) ** 2  # B, L, n_symbols, dim 
+        dist = torch.sum(diff, dim=3)  # B, L, n_symbols
+        dist[:, :, ~self.used_phn_idxs] = 3e5
+        q_result = dist.argmin(2)  # B, L
 
-        return unsup_repr_quantize
+        return q_result
     
     def s_common_step(self, s_batch, batch_idx, train=True):
         # print(self.emb_layer._parameters['weight'].requires_grad)
@@ -173,16 +231,6 @@ class SemiTransEmbTuneSystem(System):
         emb_texts = F.embedding(batch[3], emb_table, padding_idx=0)
         output = self.model(self.fix_spk_args, emb_texts, *(batch[4:6]), average_spk_emb=True)
         return output
-
-    # def text_synth_step(self, batch, batch_idx):  # only used when predict (use TextDataset2)
-    #     emb_texts = self.emb_layer(batch[2])
-    #     output = self.model(self.fix_spk_args, emb_texts, *(batch[3:5]), average_spk_emb=True)
-    #     return output
-    #     # ids,
-    #     # raw_texts,
-    #     # torch.from_numpy(texts).long(),
-    #     # torch.from_numpy(text_lens),
-    #     # max(text_lens),
     
     def check_s_batch(self, s_batch):
         assert len(s_batch) == 12, "data with 12 elements"
@@ -204,13 +252,19 @@ class SemiTransEmbTuneSystem(System):
 
     def training_step(self, batch, batch_idx):
         s_train_loss, predictions = self.s_common_step(batch["sup"], batch_idx, train=True)
-        u_train_loss = self.u_common_step(batch["unsup"], batch_idx, train=True)
+
+        # Select different method to utilize unsupervised data!
+        # u_train_loss = self.u_common_step(batch["unsup"], batch_idx, train=True)
+        # u_train_loss = self.uq_common_step(batch["unsup"], batch_idx, train=True)
+        u_train_loss = self.u_avg_common_step(batch["unsup"], batch_idx, train=True)
+        # u_train_loss = self.u_fix_table_common_step(batch["unsup"], batch_idx, train=True)
+
         train_loss = []
         if Define.DEBUG:
             print("Sup/Unsup training loss:")
             print(s_train_loss[0], u_train_loss[0])
         for i in range(len(s_train_loss)):
-            train_loss.append(1.0 * s_train_loss[i] + 0.0 * u_train_loss[i])
+            train_loss.append(0.0 * s_train_loss[i] + 1.0 * u_train_loss[i])
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}

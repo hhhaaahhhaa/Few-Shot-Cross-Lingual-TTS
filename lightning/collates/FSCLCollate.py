@@ -104,17 +104,18 @@ class FSCLCollate(object):
         return np.array(sup_ids), np.array(qry_ids)
 
 
-class UnsupFSCLCollate(object):
+class GeneralFSCLCollate(object):
     """
-    Unsupervised version of FSCLCollate.
+    Provide raw features and segments for speech representation extraction.
+    This is a general version of FSCLCollate (without split).
     """
     def __init__(self):
         pass
 
-    def collate_fn(self, sort=False):
-        return partial(self._collate_fn, sort=sort)
+    def collate_fn(self, sort=False, mode="sup"):
+        return partial(self._collate_fn, sort=sort, mode=mode)
 
-    def _collate_fn(self, data, sort=False):
+    def _collate_fn(self, data, sort=False, mode="sup"):
         data_size = len(data)
 
         if sort:
@@ -122,9 +123,40 @@ class UnsupFSCLCollate(object):
             idx_arr = np.argsort(-len_arr)
         else:
             idx_arr = np.arange(data_size)
-        output = reprocess(data, idx_arr, mode="unsup")
+        output = reprocess(data, idx_arr, mode=mode)
 
         repr_info = {}
+        if mode == "sup":
+            lang_id = data[0]["lang_id"]
+            repr_info["lang_id"] = lang_id
+            repr_info["texts"] = [data[idx]["text"] for idx in idx_arr]
+
         repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
         repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
         return (output, repr_info)
+
+
+# class UnsupFSCLCollate(object):
+#     """
+#     Unsupervised version of SupFSCLCollate. Use GeneralFSCLCollate to replace.
+#     """
+#     def __init__(self):
+#         pass
+
+#     def collate_fn(self, sort=False):
+#         return partial(self._collate_fn, sort=sort)
+
+#     def _collate_fn(self, data, sort=False):
+#         data_size = len(data)
+
+#         if sort:
+#             len_arr = np.array([d["duration"].shape[0] for d in data])
+#             idx_arr = np.argsort(-len_arr)
+#         else:
+#             idx_arr = np.arange(data_size)
+#         output = reprocess(data, idx_arr, mode="unsup")
+
+#         repr_info = {}
+#         repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
+#         repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
+#         return (output, repr_info)
