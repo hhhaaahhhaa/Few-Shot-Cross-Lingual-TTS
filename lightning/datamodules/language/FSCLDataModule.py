@@ -3,11 +3,11 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
-from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, TextDataset, few_shot_task_dataset
+from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, SSLUnitFSCLDataset, TextDataset, few_shot_task_dataset
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
 from lightning.collates import GeneralFSCLCollate
-from .FastSpeech2DataModule import FastSpeech2DataModule
+from .FastSpeech2DataModule import FastSpeech2DataModule, FastSpeech2TuneDataModule
 
 
 class FSCLDataModule(pl.LightningDataModule):
@@ -132,11 +132,11 @@ class FSCLDataModule(pl.LightningDataModule):
 
 class SupFSCLDataModule(pl.LightningDataModule):
     """
-    Train: FSCLDataset + GeneralFSCLCollate (sup).
-    Val: FSCLDataset + GeneralFSCLCollate (sup).
+    Train: FSCLDataset / SSLUnitFSCLDataset + GeneralFSCLCollate (sup).
+    Val: FSCLDataset / SSLUnitFSCLDataset + GeneralFSCLCollate (sup).
     Test: None.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset):
         super().__init__()
         self.data_configs = data_configs
         self.train_config = train_config
@@ -147,6 +147,7 @@ class SupFSCLDataModule(pl.LightningDataModule):
         self.val_step = self.train_config["step"]["val_step"]
 
         self.collate = GeneralFSCLCollate()
+        self.dataset_cls = dataset_cls
 
     def setup(self, stage=None):
         spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
@@ -154,14 +155,14 @@ class SupFSCLDataModule(pl.LightningDataModule):
 
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
-                FSCLDataset(
+                self.dataset_cls(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
-                FSCLDataset(
+                self.dataset_cls(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config, spk_refer_wav=spk_refer_wav
@@ -325,15 +326,18 @@ class SemiFSCLTuneDataModule(pl.LightningDataModule):
     """
     def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
-        self.sup_datamodule = FastSpeech2DataModule(data_configs["sup"], 
+        self.sup_datamodule = FastSpeech2TuneDataModule(data_configs["sup"], 
                                                 train_config, algorithm_config, log_dir, result_dir)
-        self.sup_datamodule.re_id = False
         # self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
         #                                         train_config, algorithm_config, log_dir, result_dir)
         
         # Oracle
+        # self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
+        #                                         train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset)
+
+        # SSL Units
         self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
-                                                train_config, algorithm_config, log_dir, result_dir)
+                                                train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
 
     def setup(self, stage=None):
         self.sup_datamodule.setup(stage)

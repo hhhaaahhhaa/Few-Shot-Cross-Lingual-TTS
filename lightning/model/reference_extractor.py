@@ -7,7 +7,7 @@ import s3prl.hub as hub
 
 import Define
 from text.define import LANG_ID2SYMBOLS
-from lightning.utils.tool import numpy_exist_nan, torch_exist_nan
+from lightning.utils.tool import torch_exist_nan
 
 
 class S3PRLExtractor(pl.LightningModule):
@@ -16,12 +16,6 @@ class S3PRLExtractor(pl.LightningModule):
         self.ssl_extractor = getattr(hub, name)()
         self.repr_reduction = AverageReprModule()
         # self.repr_reduction = RandomSelectReprModule()
-
-    # def extract_numpy(self, wav):
-    #     wav = torch.from_numpy(wav).float().cuda()
-    #     representation = self.ssl_extractor([wav])
-    #     representation = torch.stack(representation["hidden_states"], dim=1)
-    #     return representation.detach().cpu().numpy()
 
     def extract(self, info, norm=False, batch_size=32, no_text=False):
         representation_list = []
@@ -59,8 +53,9 @@ class S3PRLExtractor(pl.LightningModule):
                 self.log(unsup_repr.shape)
             return unsup_repr.to(self.device)
         else:
-            lang_id = info["lang_id"]
-            n_symbols = len(LANG_ID2SYMBOLS[lang_id])
+            # lang_id = info["lang_id"]
+            # n_symbols = len(LANG_ID2SYMBOLS[lang_id])
+            n_symbols = info["n_symbols"]
             texts = info["texts"]
             table = {i: [] for i in range(n_symbols)}
             for text, d_list, repr in zip(texts, avg_frames, representation_list):
@@ -128,8 +123,9 @@ class MelExtractor(pl.LightningModule):
                 self.log(unsup_repr.shape)
             return unsup_repr
         else:
-            lang_id = info["lang_id"]
-            n_symbols = len(LANG_ID2SYMBOLS[lang_id])
+            # lang_id = info["lang_id"]
+            # n_symbols = len(LANG_ID2SYMBOLS[lang_id])
+            n_symbols = info["n_symbols"]
             texts = info["texts"]
 
             table = {i: [] for i in range(n_symbols)}

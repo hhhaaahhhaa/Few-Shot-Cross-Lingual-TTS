@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 
 from Parsers.parser import DataParser
 from text import text_to_sequence
+from text.define import LANG_ID2SYMBOLS
 import Define
 
 
@@ -209,6 +210,7 @@ def generate_reference(path, data_parser: DataParser, lang_id):
     """
     info = {
         "lang_id": lang_id,
+        "n_symbols": len(LANG_ID2SYMBOLS[lang_id]),
         "avg-frames": [],
         "raw-feat": [],
         "texts": [],

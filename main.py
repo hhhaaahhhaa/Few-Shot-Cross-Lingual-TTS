@@ -53,6 +53,7 @@ def main(args, configs):
         parse_prep = {
             "name": prep["dataset"],
             "lang_id": prep["lang_id"],
+            "unit_name": prep.get("unit_name", ""),
             "data_dir": prep["path"]["preprocessed_path"], 
             "subsets": prep["subsets"],
             "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
@@ -150,7 +151,7 @@ def main(args, configs):
         config_reader = LanguageDataConfigReader()
         data_configs = {
             # "sup": data_configs,
-            "sup": [config_reader.read("_data/JSUT/16-shot/task-0")],
+            "sup": [config_reader.read("_data/JSUT/4-shot/task-0")],
             "unsup": data_configs,
         }
     datamodule = get_datamodule(algorithm_config["type"])(
@@ -208,7 +209,7 @@ def main(args, configs):
         # Get model
         system = get_system(algorithm_config["type"])
         assert pretrain_ckpt_file is not None
-        assert len(preprocess_configs) == 1  # transfer one language at a time
+        # assert len(preprocess_configs) == 1  # transfer one language at a time
         model = system.load_from_checkpoint(
             pretrain_ckpt_file,
             preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
@@ -216,7 +217,7 @@ def main(args, configs):
         )
         if "semi" in algorithm_config["type"]:
             # model.tune_init(data_configs["sup"][0])
-            model.tune_init(config_reader.read("_data/JSUT/16-shot/task-0"))
+            model.tune_init(config_reader.read("_data/JSUT/4-shot/task-0"))
         else:
             pass
 

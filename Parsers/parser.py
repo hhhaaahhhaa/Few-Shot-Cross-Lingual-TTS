@@ -1,17 +1,58 @@
 import os
-import glob
 import json
+from typing import Dict
 
 from dlhlp_lib.parsers.Feature import Feature
 from dlhlp_lib.parsers.QueryParsers import SFQueryParser, NestSFQueryParser
 from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO
 
 
-class DataParser(object):
+
+class BaseParser(object):
     def __init__(self, root):
         self.root = root
-        self.__init_structure()
-        self.queries = None
+        self._init_structure()
+
+    def _init_structure(self):
+        raise NotImplementedError
+
+    def get_feature(self, query: str) -> Feature:
+        raise NotImplementedError
+
+
+class SSLUnitParser(BaseParser):
+    def __init__(self, root):
+        super().__init__(root)
+
+        self.dp_segment = Feature(
+            "dp_segment", root, SFQueryParser(f"{self.root}/dp_segment"), PickleIO(), enable_cache=True)
+        self.phoneme = Feature(
+            "phoneme", root, SFQueryParser(f"{self.root}/phoneme"), TextIO(), enable_cache=True)
+        self.dp_duration = Feature(
+            "dp_duration", root, SFQueryParser(f"{self.root}/dp_duration"), NumpyIO(), enable_cache=True)
+        self.dp_duration_avg_pitch = Feature(
+            "dp_duration_avg_pitch", root, SFQueryParser(f"{self.root}/dp_duration_avg_pitch"), NumpyIO(), enable_cache=True)
+        self.dp_duration_avg_energy = Feature(
+            "dp_duration_avg_energy", root, SFQueryParser(f"{self.root}/dp_duration_avg_energy"), NumpyIO(), enable_cache=True)
+
+    def _init_structure(self):
+        os.makedirs(f"{self.root}/dp_segment", exist_ok=True)
+        os.makedirs(f"{self.root}/phoneme", exist_ok=True)
+        os.makedirs(f"{self.root}/dp_duration", exist_ok=True)
+        os.makedirs(f"{self.root}/dp_duration_avg_pitch", exist_ok=True)
+        os.makedirs(f"{self.root}/dp_duration_avg_energy", exist_ok=True)
+
+    def get_feature(self, query: str) -> Feature:
+        return getattr(self, query)
+
+
+class DataParser(BaseParser):
+
+    ssl_units: Dict[str, SSLUnitParser]
+
+    def __init__(self, root):
+        super().__init__(root)
+        self.__init_ssl_units()
 
         self.wav_16000 = Feature(
             "wav_16000", root, SFQueryParser(f"{self.root}/wav_16000"), WavIO(sr=16000))
@@ -61,7 +102,7 @@ class DataParser(object):
         self.stats_path = f"{self.root}/stats.json"
         self.speakers_path = f"{self.root}/speakers.json"
 
-    def __init_structure(self):
+    def _init_structure(self):
         os.makedirs(f"{self.root}/wav_16000", exist_ok=True)
         os.makedirs(f"{self.root}/wav_22050", exist_ok=True)
         os.makedirs(f"{self.root}/mel", exist_ok=True)
@@ -95,3 +136,43 @@ class DataParser(object):
             }
             res.append(query)
         return res
+    
+    def __init_ssl_units(self):
+        self.ssl_units = {}
+        os.makedirs(f"{self.root}/ssl_units", exist_ok=True)
+        unit_names = os.listdir(f"{self.root}/ssl_units")
+        for unit_name in unit_names:
+            self.ssl_units[unit_name] = SSLUnitParser(f"{self.root}/ssl_units/{unit_name}")
+
+    def create_ssl_unit_feature(self, unit_name):
+        if unit_name not in self.ssl_units:
+            self.ssl_units[unit_name] = SSLUnitParser(f"{self.root}/ssl_units/{unit_name}")
+
+    # def get_ssl_unit_feature(self, query) -> Feature:
+    #     """
+    #     Args:
+    #         query: Dictionary with format
+    #             {
+    #                 "unit_name": str,
+    #                 "feat_name": str,
+    #             }
+    #     """
+    #     unit_parser = self.ssl_units.get(query["unit_name"], None)
+    #     if unit_parser is None:
+    #         print(f"Can not get SSL unit ({query['unit_name']})!")
+    #         raise KeyError
+    #     res = getattr(unit_parser, query["feat_name"], None)
+    #     if res is None:
+    #         print(f"Can not get feat name ({query['feat_name']})!")
+    #         raise KeyError
+    #     return res
+
+    def get_feature(self, query: str) -> Feature:
+        if "/" not in query:
+            return getattr(self, query)
+        prefix, subquery = query.split("/", 1)
+        if prefix == "ssl_units":
+            unit_name, subquery = subquery.split("/", 1)
+            return self.ssl_units[unit_name].get_feature(subquery)
+        else:
+            raise NotImplementedError

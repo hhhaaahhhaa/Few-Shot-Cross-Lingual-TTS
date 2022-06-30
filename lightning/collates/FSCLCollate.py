@@ -59,8 +59,10 @@ class FSCLCollate(object):
             # pad_qry = time.time() - st1
 
             lang_id = data[idxs[0]]["lang_id"]
+            n_symbols = data[idxs[0]]["n_symbols"]
             repr_info = {}
             repr_info["lang_id"] = lang_id
+            repr_info["n_symbols"] = n_symbols
             repr_info["texts"] = [data[idx]["text"] for idx in idxs]
             repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
             repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idxs]
@@ -128,35 +130,10 @@ class GeneralFSCLCollate(object):
         repr_info = {}
         if mode == "sup":
             lang_id = data[0]["lang_id"]
+            repr_info["n_symbols"] = data[0]["n_symbols"]
             repr_info["lang_id"] = lang_id
             repr_info["texts"] = [data[idx]["text"] for idx in idx_arr]
 
         repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
         repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
         return (output, repr_info)
-
-
-# class UnsupFSCLCollate(object):
-#     """
-#     Unsupervised version of SupFSCLCollate. Use GeneralFSCLCollate to replace.
-#     """
-#     def __init__(self):
-#         pass
-
-#     def collate_fn(self, sort=False):
-#         return partial(self._collate_fn, sort=sort)
-
-#     def _collate_fn(self, data, sort=False):
-#         data_size = len(data)
-
-#         if sort:
-#             len_arr = np.array([d["duration"].shape[0] for d in data])
-#             idx_arr = np.argsort(-len_arr)
-#         else:
-#             idx_arr = np.arange(data_size)
-#         output = reprocess(data, idx_arr, mode="unsup")
-
-#         repr_info = {}
-#         repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
-#         repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
-#         return (output, repr_info)
