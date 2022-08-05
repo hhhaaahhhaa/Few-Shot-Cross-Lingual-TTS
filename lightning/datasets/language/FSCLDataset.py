@@ -12,7 +12,7 @@ from lightning.utils.tool import numpy_exist_nan
 
 class FSCLDataset(Dataset):
     """
-    Extension of FastSpeech2Dataset, provide speech representations.
+    Extension of FastSpeech2Dataset, provide raw speech representations.
     """
     def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False):
         self.data_parser = data_parser
@@ -224,11 +224,12 @@ class UnsupFSCLDataset(Dataset):
 
 class SSLUnitFSCLDataset(Dataset):
     """
-    SSL Unit version of FSCLDataset, however, this is an unsupervised method.
+    SSL Unit version of FSCLDataset, however, this can be an semi-supervised/unsupervised method.
     """
-    def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False):
+    def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False, map2phoneme=False):
         self.data_parser = data_parser
         self.spk_refer_wav = spk_refer_wav
+        self.map2phoneme = map2phoneme
 
         self.name = config["name"]
         self.lang_id = config["lang_id"]
@@ -238,6 +239,11 @@ class SSLUnitFSCLDataset(Dataset):
         with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
             kmeans_model = pickle.load(f)
             self.n_clusters = kmeans_model.cluster_centers_.shape[0]
+        if self.map2phoneme:
+            with open(f"{self.unit_parser.root}/centroids2phoneme.pkl", "rb") as f:
+                pairs = pickle.load(f)
+            self.unit2phoneme = {idx: phn for (idx, phn) in pairs}
+            self.cleaners = config["text_cleaners"]
 
         self.basename, self.speaker = self.process_meta(filename)
         with open(self.data_parser.speakers_path, 'r', encoding='utf-8') as f:
@@ -266,7 +272,13 @@ class SSLUnitFSCLDataset(Dataset):
         _, _, global_pitch_mu, global_pitch_std, _, _, global_energy_mu, global_energy_std = Define.ALLSTATS["global"]
         pitch = (pitch - global_pitch_mu) / global_pitch_std  # normalize
         energy = (energy - global_energy_mu) / global_energy_std  # normalize
-        text = np.array([int(phn) for phn in phonemes.split(" ")])
+        
+        if self.map2phoneme:
+            phonemes = " ".join([self.unit2phoneme[phn] for phn in phonemes.split(" ")])
+            phonemes = f"{{{phonemes}}}"
+            text = np.array(text_to_sequence(phonemes, self.cleaners, self.lang_id))
+        else:
+            text = np.array([int(phn) for phn in phonemes.split(" ")])
         
         assert not numpy_exist_nan(mel)
         assert not numpy_exist_nan(pitch)
@@ -276,6 +288,7 @@ class SSLUnitFSCLDataset(Dataset):
             assert len(text) == len(duration) == len(pitch) == len(energy)
         except:
             print(query)
+            print(phonemes)
             print(text)
             print(len(text), len(phonemes), len(duration), len(pitch), len(energy))
             raise
@@ -329,3 +342,11 @@ class SSLUnitFSCLDataset(Dataset):
                 name.append(n)
                 speaker.append(s)
             return name, speaker
+
+
+class SSLUnitPseudoLabelDataset(SSLUnitFSCLDataset):
+    """
+    SSLUnitFSCLDataset, but units are matched to real phonemes (pseudo labels).
+    """
+    def __init__(self, filename, data_parser: DataParser, config=None, spk_refer_wav=False):
+        super().__init__(filename, data_parser, config, spk_refer_wav, map2phoneme=True)

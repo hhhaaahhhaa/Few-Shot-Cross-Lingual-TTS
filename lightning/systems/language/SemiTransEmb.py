@@ -13,7 +13,6 @@ from lightning.model import get_reference_extractor_cls
 from lightning.callbacks.language.fscl_saver import Saver
 from lightning.callbacks import GlobalProgressBar
 from Objects.visualization import CodebookAnalyzer
-from lightning.model.reference_extractor import HubertExtractor, XLSR53Extractor, Wav2Vec2Extractor, MelExtractor
 from transformer import Constants
 import Define
 

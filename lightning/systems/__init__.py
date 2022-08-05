@@ -1,4 +1,5 @@
 from . import language
+from . import phoneme_recognition
 
 # Old
 # SYSTEM = {
@@ -19,7 +20,9 @@ SYSTEM = {
     "semi-fscl": language.SemiTransEmbSystem,
     "semi-fscl-tune": language.SemiTransEmbTuneSystem,
     "multilingual-baseline": language.BaselineSystem,
-    "multilingual-baseline-tune": language.BaselineSystem,
+    "multilingual-baseline-tune": language.BaselineTuneSystem,
+    "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
+    "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem
 }
 
 def get_system(algorithm):

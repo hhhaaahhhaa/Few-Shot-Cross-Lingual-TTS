@@ -188,6 +188,12 @@ def asr_loss2dict(loss):
     }
 
 
+def pr_loss2dict(loss):
+    return {
+        "Total Loss": loss.item(),
+    }
+
+
 def dual_loss2dict(loss):
     tts_loss, asr_loss = loss
     tblog_dict = {

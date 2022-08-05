@@ -15,7 +15,6 @@ from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.callbacks.language.baseline_saver import Saver
 from lightning.callbacks import GlobalProgressBar
 from Objects.visualization import CodebookAnalyzer
-from Objects.config import LanguageDataConfigReader
 from transformer import Constants
 import Define
 from text.define import LANG_ID2SYMBOLS
@@ -108,36 +107,41 @@ class SemiTransEmbTuneSystem(System):
         #     p.requires_grad = False
 
         # If use fix table for unsupervised training...
-        import pickle
-        table_path = "_data/JSUT/hubert-phoneme-average.pkl"
-        with open(table_path, 'rb') as f:
-            table = pickle.load(f)
+        # Averaged from the whole dataset
+        # import pickle
+        # table_path = "_data/JSUT/hubert-phoneme-average.pkl"
+        # with open(table_path, 'rb') as f:
+        #     table = pickle.load(f)
 
-        n_phns = len(LANG_ID2SYMBOLS[self.lang_id])
-        unsup_fix_emb_table = np.zeros((n_phns, 25, 1024))
-        for i, p in enumerate(LANG_ID2SYMBOLS[self.lang_id]):
-            if p in table:
-                unsup_fix_emb_table[i] = table[p]
-        unsup_fix_emb_table = torch.from_numpy(unsup_fix_emb_table).float().cuda()
+        # n_phns = len(LANG_ID2SYMBOLS[self.lang_id])
+        # unsup_fix_emb_table = np.zeros((n_phns, 25, 1024))
+        # for i, p in enumerate(LANG_ID2SYMBOLS[self.lang_id]):
+        #     if p in table:
+        #         unsup_fix_emb_table[i] = table[p]
+        # unsup_fix_emb_table = torch.from_numpy(unsup_fix_emb_table).float().cuda()
 
-        if Define.DEBUG:
-            debug_matching2 = unsup_fix_emb_table
+        # if Define.DEBUG:
+        #     debug_matching2 = unsup_fix_emb_table
         
-        unsup_fix_emb_table = unsup_fix_emb_table.unsqueeze(0)  # match embedding model's input size
-        with torch.no_grad():
-            self.unsup_fix_emb_table = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_fix_emb_table, lang_id=self.lang_id)
-            self.unsup_fix_emb_table = self.unsup_fix_emb_table.squeeze(0)
-            self.unsup_fix_emb_table.requires_grad = False
-        # print(debug_matching1.shape, debug_matching1.device)
-        # print(debug_matching2.shape, debug_matching2.device)
-        # print((debug_matching1 - debug_matching2)[self.used_phn_idxs].sum())  # should close to 0
-        # print("")
-        # print(self.unsup_fix_emb_table.shape)
-        # print((embedding - self.unsup_fix_emb_table)[self.used_phn_idxs].sum())  # should close to 0
-        # input()
-        if Define.DEBUG:
-            print("Load unsupervised precalculated result, embedding table shape:")
-            print(self.unsup_fix_emb_table.shape)
+        # unsup_fix_emb_table = unsup_fix_emb_table.unsqueeze(0)  # match embedding model's input size
+        # with torch.no_grad():
+        #     self.unsup_fix_emb_table = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=unsup_fix_emb_table, lang_id=self.lang_id)
+        #     self.unsup_fix_emb_table = self.unsup_fix_emb_table.squeeze(0)
+        #     self.unsup_fix_emb_table.requires_grad = False
+        # # print(debug_matching1.shape, debug_matching1.device)
+        # # print(debug_matching2.shape, debug_matching2.device)
+        # # print((debug_matching1 - debug_matching2)[self.used_phn_idxs].sum())  # should close to 0
+        # # print("")
+        # # print(self.unsup_fix_emb_table.shape)
+        # # print((embedding - self.unsup_fix_emb_table)[self.used_phn_idxs].sum())  # should close to 0
+        # # input()
+        # if Define.DEBUG:
+        #     print("Load unsupervised precalculated result, embedding table shape:")
+        #     print(self.unsup_fix_emb_table.shape)
+
+        # Shared with few shot labeled data initialization.
+        self.unsup_fix_emb_table = embedding.clone().detach()
+        self.unsup_fix_emb_table.requires_grad = False
 
     def u_common_step(self, u_batch, batch_idx, train=True):
         # unsupervised loss
@@ -162,7 +166,7 @@ class SemiTransEmbTuneSystem(System):
     
     def u_fix_table_common_step(self, u_batch, batch_idx, train=True):
         """
-        Variant of u_common_step with fix embedding table averaged from the whole dataset.
+        Variant of u_common_step with fix embedding table.
         This code is for experiment only, manually set a path inside the code block.
         """
         u_batch_data, u_repr_info = u_batch
@@ -290,8 +294,8 @@ class SemiTransEmbTuneSystem(System):
         # Select different method to utilize unsupervised data!
         # u_train_loss = self.u_common_step(batch["unsup"], batch_idx, train=True)
         # u_train_loss = self.uq_common_step(batch["unsup"], batch_idx, train=True)
-        u_train_loss = self.u_avg_common_step(batch["unsup"], batch_idx, train=True)
-        # u_train_loss = self.u_fix_table_common_step(batch["unsup"], batch_idx, train=True)
+        # u_train_loss = self.u_avg_common_step(batch["unsup"], batch_idx, train=True)
+        u_train_loss = self.u_fix_table_common_step(batch["unsup"], batch_idx, train=True)
 
         train_loss = []
         if Define.DEBUG:

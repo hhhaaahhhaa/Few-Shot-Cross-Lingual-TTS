@@ -8,9 +8,9 @@ from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN, generate_reference
 from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
+from lightning.model import get_reference_extractor_cls
 from lightning.callbacks.baseline_saver import Saver
 from Objects.visualization import CodebookAnalyzer
-from lightning.model.reference_extractor import HubertExtractor, XLSR53Extractor, Wav2Vec2Extractor, MelExtractor
 from text.define import LANG_ID2SYMBOLS
 import Define
 
@@ -45,16 +45,7 @@ class TransEmbTuneSystem(System):
         # Tune loss
         self.loss_func = FastSpeech2Loss(self.preprocess_config, self.model_config)
 
-        if Define.UPSTREAM == "hubert":
-            self.reference_extractor = HubertExtractor()
-        elif Define.UPSTREAM == "wav2vec2":
-            self.reference_extractor = Wav2Vec2Extractor()
-        elif Define.UPSTREAM == "xlsr53":
-            self.reference_extractor = XLSR53Extractor()
-        elif Define.UPSTREAM == "mel":
-            self.reference_extractor = MelExtractor()
-        else:
-            raise NotImplementedError
+        self.reference_extractor = get_reference_extractor_cls(Define.UPSTREAM)()
         self.reference_extractor.freeze()
 
     def build_optimized_model(self):

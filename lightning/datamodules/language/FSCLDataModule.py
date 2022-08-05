@@ -3,7 +3,7 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
-from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, SSLUnitFSCLDataset, TextDataset, few_shot_task_dataset
+from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, SSLUnitFSCLDataset, SSLUnitPseudoLabelDataset, TextDataset, few_shot_task_dataset
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
 from lightning.collates import GeneralFSCLCollate
@@ -336,8 +336,12 @@ class SemiFSCLTuneDataModule(pl.LightningDataModule):
         #                                         train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset)
 
         # SSL Units
+        # self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
+        #                                         train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
+        
+        # SSL Units but mapped to phonemes
         self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
-                                                train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
+                                                train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitPseudoLabelDataset)
 
     def setup(self, stage=None):
         self.sup_datamodule.setup(stage)

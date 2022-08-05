@@ -33,7 +33,7 @@ class BaselineTuneSystem(System):
         self.vocoder.freeze()
 
         # Tune
-        self.model.freeze()
+        # self.model.freeze()
 
         # # Tune
         self.lang_id = self.preprocess_config["lang_id"]
@@ -49,15 +49,14 @@ class BaselineTuneSystem(System):
     # Tune Interface
     def tune_init(self):
         # Freeze part of the model
-        self.model.freeze()
+        # self.model.freeze()
         self.lang_id = self.preprocess_config["lang_id"]
-        self.tune = True
         print("Current language: ", self.lang_id)
 
     def common_step(self, batch, batch_idx, train=True):
         if getattr(self, "fix_spk_args", None) is None:
             self.fix_spk_args = batch[2]
-            emb_texts = F.embedding(batch[3], self.embedding_model.get_new_embedding("table-sep", lang_id=self.lang_id, init=False), padding_idx=0)
+        emb_texts = F.embedding(batch[3], self.embedding_model.get_new_embedding("table-sep", lang_id=self.lang_id, init=False), padding_idx=0)
         output = self.model(batch[2], emb_texts, *(batch[4:]))
         loss = self.loss_func(batch, output)
         return loss, output
@@ -67,13 +66,18 @@ class BaselineTuneSystem(System):
         output = self.model(self.fix_spk_args, emb_texts, *(batch[4:6]), average_spk_emb=True)
         return output
 
-    def text_synth_step(self, batch, batch_idx):  # only used when inference (use TextDataset2)
-        emb_texts = F.embedding(batch[2], self.embedding_model.get_new_embedding("table-sep", lang_id=self.lang_id, init=False), padding_idx=0)
-        output = self.model(self.fix_spk_args, emb_texts, *(batch[3:5]), average_spk_emb=True)
-        return output
+    # def text_synth_step(self, batch, batch_idx):  # only used when inference (use TextDataset2)
+    #     emb_texts = F.embedding(batch[2], self.embedding_model.get_new_embedding("table-sep", lang_id=self.lang_id, init=False), padding_idx=0)
+    #     output = self.model(self.fix_spk_args, emb_texts, *(batch[3:5]), average_spk_emb=True)
+    #     return output
     
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
-        assert len(batch) == 12, f"data with 12 elements, but get {len(batch)}"
+        # try:
+        #     assert len(batch) == 12, f"data with 12 elements, but get {len(batch)}"
+        # except:
+        #     print(f"data with 12 elements, but get {len(batch)}")
+        #     input()
+        pass
 
     def training_step(self, batch, batch_idx):
         loss, output = self.common_step(batch, batch_idx, train=True)
@@ -84,7 +88,12 @@ class BaselineTuneSystem(System):
         return {'loss': loss[0], 'losses': loss, 'output': output, '_batch': batch}
 
     def on_validation_batch_start(self, batch, batch_idx, dataloader_idx):
-        assert len(batch) == 12, f"data with 12 elements, but get {len(batch)}"
+        # try:
+        #     assert len(batch) == 12, f"data with 12 elements, but get {len(batch)}"
+        # except:
+        #     print(f"data with 12 elements, but get {len(batch)}")
+        #     input()
+        pass
     
     def validation_step(self, batch, batch_idx):
         val_loss, predictions = self.common_step(batch, batch_idx, train=False)
@@ -103,5 +112,5 @@ class BaselineTuneSystem(System):
         return outputs
 
     def generate_azure_wavs(self, batch, batch_idx):
-        synth_predictions = self.text_synth_step(batch, batch_idx)
+        synth_predictions = self.synth_step(batch, batch_idx)
         return {'_batch': batch, 'synth': synth_predictions}

@@ -9,8 +9,8 @@ optimizer:
   anneal_steps: [300000, 400000, 500000]
   anneal_rate: 0.3
 step:
-  total_step: 1500
+  total_step: 10000
   log_step: 250
-  synth_step: 5000
+  synth_step: 100000
   val_step: 250
-  save_step: 5000
+  save_step: 2500

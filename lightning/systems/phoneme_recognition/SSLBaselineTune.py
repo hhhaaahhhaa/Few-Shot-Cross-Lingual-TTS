@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+from dlhlp_lib.s3prl import S3PRLExtractor
+
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.utils.log import loss2dict
 from lightning.utils.tool import LightningMelGAN
@@ -10,24 +12,20 @@ from lightning.model.phoneme_embedding import PhonemeEmbedding
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.model import get_reference_extractor_cls
 from lightning.callbacks.language.fscl_saver import Saver
-from Objects.visualization import CodebookAnalyzer
 import Define
 from transformer import Constants
 
 
-class TransEmbSystem(AdaptorSystem):
+class SSLBaselineTuneSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.init_codebook_type()
-
-        # tests
-        self.codebook_analyzer = CodebookAnalyzer(self.result_dir)
-        # self.test_list = {
-        #     "codebook visualization": self.visualize_matching,
-        # }
 
     def build_model(self):
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.downstream = None # BiLSTM
+        self.head = None
         self.embedding_model = PhonemeEmbedding(self.model_config, self.algorithm_config)
         self.model = FastSpeech2(self.preprocess_config, self.model_config, self.algorithm_config)
         self.loss_func = FastSpeech2Loss(self.preprocess_config, self.model_config)

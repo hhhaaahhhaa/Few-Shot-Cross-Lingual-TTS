@@ -2,8 +2,10 @@ import numpy as np
 from pandas import array
 from torch.utils.data import Dataset
 import json
+import random
 
 import Define
+from text.define import LANG_ID2SYMBOLS
 from text import text_to_sequence
 from Parsers.parser import DataParser
 from lightning.utils.tool import numpy_exist_nan
@@ -25,6 +27,8 @@ class FastSpeech2Dataset(Dataset):
         with open(self.data_parser.speakers_path, 'r', encoding='utf-8') as f:
             self.speakers = json.load(f)
             self.speaker_map = {spk: i for i, spk in enumerate(self.speakers)}
+
+        self.p_noise = 0.0
 
     def __len__(self):
         return len(self.basename)
@@ -51,6 +55,12 @@ class FastSpeech2Dataset(Dataset):
         pitch = (pitch - global_pitch_mu) / global_pitch_std  # normalize
         energy = (energy - global_energy_mu) / global_energy_std  # normalize
         text = np.array(text_to_sequence(phonemes, self.cleaners, self.lang_id))
+
+        if self.p_noise > 0:  # add noise to data
+            n_symbols = len(LANG_ID2SYMBOLS[self.lang_id])
+            for i in range(len(text)):
+                if random.random() < self.p_noise:
+                    text[i] = random.randint(1, n_symbols) - 1
         
         assert not numpy_exist_nan(mel)
         assert not numpy_exist_nan(pitch)
@@ -91,3 +101,9 @@ class FastSpeech2Dataset(Dataset):
                 name.append(n)
                 speaker.append(s)
             return name, speaker
+
+
+class NoisyFastSpeech2Dataset(FastSpeech2Dataset):
+    def __init__(self, filename, data_parser: DataParser, config, spk_refer_wav=False):
+        super().__init__(filename, data_parser, config, spk_refer_wav)
+        self.p_noise = 0.3

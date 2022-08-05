@@ -158,6 +158,9 @@ def main(args, configs):
         data_configs, train_config, algorithm_config, log_dir, result_dir
     )
 
+    if Define.DEBUG:
+        print("All components except system module are prepared.")
+        input()
     if args.stage == 'train':
         # Get model
         system = get_system(algorithm_config["type"])
@@ -173,6 +176,10 @@ def main(args, configs):
                 preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
                 log_dir=log_dir, result_dir=result_dir
             )
+
+        if Define.DEBUG:
+            print("System module prepared.")
+            input()
 
         # Train
         if Define.DEBUG:

@@ -3,18 +3,20 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
-from lightning.collates import LanguageCollate, TextCollate
-from lightning.datasets.language import FastSpeech2Dataset, TextDataset, SSLUnitPseudoLabelDataset, NoisyFastSpeech2Dataset
-from ..utils import EpisodicInfiniteWrapper
+from lightning.collates import TextCollate, SSLPRCollate
+from lightning.datasets.language import TextDataset
+from lightning.datasets.phoneme_recognition import SSLPRDataset
+from lightning.datasets.phoneme_recognition.MultiTaskSampler import MultiTaskSampler, CustomSamplerDataset
+from lightning.datamodules.utils import EpisodicInfiniteWrapper
 
 
-class FastSpeech2DataModule(pl.LightningDataModule):
+class SSLPRDataModule(pl.LightningDataModule):
     """
-    Train: FastSpeech2Dataset + LanguageCollate.
-    Val: FastSpeech2Dataset + LanguageCollate.
+    Train: SSLPRDataset + PRCollate.
+    Val: SSLPRDataset + PRCollate.
     Test: TextDataset.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset):
+    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLPRDataset):
         super().__init__()
         self.data_configs = data_configs
         self.train_config = train_config
@@ -24,30 +26,25 @@ class FastSpeech2DataModule(pl.LightningDataModule):
         self.result_dir = result_dir
         self.val_step = self.train_config["step"]["val_step"]
 
-        self.re_id = True  # TODO: should be controlled by client directly
-        self.collate = LanguageCollate()
+        self.collate = SSLPRCollate()
         self.collate2 = TextCollate()
 
         self.dataset_cls = dataset_cls
 
     def setup(self, stage=None):
-        spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
-                     in ["dvec", "encoder", "scratch_encoder"])
-
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
                 self.dataset_cls(
-                # NoisyFastSpeech2Dataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, spk_refer_wav=spk_refer_wav
+                    data_config
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
                 self.dataset_cls(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
-                    data_config, spk_refer_wav=spk_refer_wav
+                    data_config
                 ) for data_config in self.data_configs if 'val' in data_config['subsets']
             ]
             self.train_dataset = ConcatDataset(self.train_datasets)
@@ -67,13 +64,15 @@ class FastSpeech2DataModule(pl.LightningDataModule):
             self._test_setup()
 
     def _train_setup(self):
-        if not isinstance(self.train_dataset, EpisodicInfiniteWrapper):
-            # self.batch_size = self.train_ways * (self.train_shots + self.train_queries) * self.meta_batch_size
-            self.batch_size = self.train_config["optimizer"]["batch_size"]
-            self.train_dataset = EpisodicInfiniteWrapper(self.train_dataset, self.val_step*self.batch_size)
-
+        self.batch_size = self.train_config["optimizer"]["batch_size"]
+        train_sampler = MultiTaskSampler(self.train_dataset, self.batch_size // torch.cuda.device_count())
+        self.batched_train_dataset = CustomSamplerDataset(self.train_dataset, train_sampler)
+        self.batched_train_dataset = EpisodicInfiniteWrapper(self.batched_train_dataset, self.val_step)
+    
     def _validation_setup(self):
-        pass
+        self.batch_size = self.train_config["optimizer"]["batch_size"]
+        val_sampler = MultiTaskSampler(self.val_dataset, self.batch_size // torch.cuda.device_count())
+        self.batched_val_dataset = CustomSamplerDataset(self.val_dataset, val_sampler)
 
     def _test_setup(self):
         pass
@@ -81,24 +80,22 @@ class FastSpeech2DataModule(pl.LightningDataModule):
     def train_dataloader(self):
         """Training dataloader, not modified for multiple dataloaders."""
         self.train_loader = DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size//torch.cuda.device_count(),
+            self.batched_train_dataset,
+            batch_size=1,
             shuffle=True,
-            drop_last=True,
             num_workers=Define.MAX_WORKERS,
-            collate_fn=self.collate.collate_fn(False, re_id=self.re_id),  # CAUTION: tune does not need re_id
+            collate_fn=lambda batch: self.collate.collate_fn(False)(batch[0]),
         )
         return self.train_loader
 
     def val_dataloader(self):
         """Validation dataloader, not modified for multiple dataloaders."""
         self.val_loader = DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size//torch.cuda.device_count(),
+            self.batched_val_dataset,
+            batch_size=1,
             shuffle=False,
-            drop_last=False,
             num_workers=0,
-            collate_fn=self.collate.collate_fn(False, re_id=self.re_id),
+            collate_fn=lambda batch: self.collate.collate_fn(False)(batch[0]),
         )
         return self.val_loader
 
@@ -108,15 +105,6 @@ class FastSpeech2DataModule(pl.LightningDataModule):
             self.test_dataset,
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=False,
-            collate_fn=self.collate2.collate_fn(False, re_id=self.re_id),
+            collate_fn=self.collate2.collate_fn(False, re_id=False),
         )
         return self.test_loader
-
-
-class FastSpeech2TuneDataModule(FastSpeech2DataModule):
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
-        super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset)
-
-        # SSL Units but mapped to phonemes
-        # super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitPseudoLabelDataset)
-        self.re_id = False

@@ -1,4 +1,0 @@
-path:
-  ckpt_path: "./output/ckpt/LibriTTS"
-  log_path: "./output/log/LibriTTS"
-  result_path: "./output/result/LibriTTS"
