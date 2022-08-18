@@ -59,14 +59,6 @@ class MultilingualTablePhonemeEmbedding(pl.LightningModule):
             return table
 
 
-class MultiHeadAttentionCodebook(pl.LightningModule):
-    """
-    Multihead Attention with learnable weights and keys, queries are from input.
-    """
-    def __init__(self, q_dim, v_dim):
-        pass
-
-
 # class MultiHeadSelfAttention(pl.LightningModule):
 #     """
 #     Standard MHSA module.

@@ -9,45 +9,46 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-from .modules import BiLSTMDownstream, MultilingualPRHead
+from .modules import BiLSTMDownstream, SoftAttCodebook
+from lightning.model.reduction import PhonemeQueryExtractor
 
 
-class SSLBaselineTuneSystem(System):
+class TransHeadTuneSystem(System):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # tests
-        self.test_list = {}
 
     def build_model(self):
         self.upstream = S3PRLExtractor("hubert_large_ll60k")
         self.upstream.freeze()
         self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, 256)
+
+        # TransHead modules
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average")
+        self.codebook = SoftAttCodebook(
+            self.model_config, self.algorithm_config, 
+            n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX
+        )
+        self.trans_head_bias = nn.Parameter(torch.zeros(1))
+
         self.loss_func = SSLBaselineLoss()
 
         if Define.DEBUG:
             print(self)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.head])
+        return nn.ModuleList([self.downstream, self.codebook])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
         return saver
-
-    # Tune Interface
-    def tune_init(self):
-        # Freeze part of the model
-        # self.model.freeze()
-        self.lang_id = self.preprocess_config["lang_id"]
-        print("Current language: ", self.lang_id)
     
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
         labels = list(labels)
         ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+        with torch.no_grad():
+            phoneme_queries = self.phoneme_query_extractor(ssl_repr)  # 1, n_symbols, n_layers, dim
         if ssl_repr.shape[1] < labels[5]:
             ssl_repr = ssl_repr.detach()
             labels[3] = labels[3][:, :ssl_repr.shape[1]]
@@ -55,12 +56,19 @@ class SSLBaselineTuneSystem(System):
         else:
             ssl_repr = ssl_repr[:, :labels[5]].detach()  # Reduce to the same size as labels, dirty
             repr_info["len"] = labels[5]
+        
         # if Define.DEBUG:
         #     print(ssl_repr.shape)
         #     print(labels[3].shape)
         
         x = self.downstream(ssl_repr)
-        output = self.head(x, lang_id=repr_info["lang_id"])
+
+        # TransHead
+        head_weights = self.codebook(phoneme_queries).squeeze(0)  # n_symbols, dim
+        if Define.DEBUG:
+            print("Head shape and gradient required: ", head_weights.shape)
+            print(head_weights.requires_grad)
+        output = F.linear(x, head_weights, bias=self.trans_head_bias)
     
         loss = self.loss_func(labels, output)
 
@@ -72,10 +80,6 @@ class SSLBaselineTuneSystem(System):
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
         labels[3] = labels[3][:, :repr_info["len"]]
 
-        mask = (labels[3] != 0)
-        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
-
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
         self.log_dict(loss_dict, sync_dist=True)
@@ -86,10 +90,6 @@ class SSLBaselineTuneSystem(System):
         labels = list(labels)
         val_loss, predictions = self.common_step(batch, batch_idx)
         labels[3] = labels[3][:, :repr_info["len"]]
-
-        mask = (labels[3] != 0)
-        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}

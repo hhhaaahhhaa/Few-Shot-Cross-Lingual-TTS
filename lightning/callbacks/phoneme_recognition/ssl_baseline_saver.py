@@ -66,10 +66,10 @@ class Saver(Callback):
                 tqdm.write(df.to_string(header=True, index=False, col_space=COL_SPACE).split('\n')[-1])
             self.log_loss_dicts.append(loss_dict)
 
-            # calculate acc
-            mask = (_batch[3] != 0)
-            acc = ((_batch[3] == output.argmax(dim=2)) * mask).sum() / mask.sum()
-            pl_module.log_dict({"Train/Acc": acc.item()})
+            # # calculate acc
+            # mask = (_batch[3] != 0)
+            # acc = ((_batch[3] == output.argmax(dim=2)) * mask).sum() / mask.sum()
+            # pl_module.log_dict({"Train/Acc": acc.item()})
 
             # log asr results
             sentence = _batch[3][0]

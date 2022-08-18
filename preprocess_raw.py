@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from multiprocessing import Pool
+from multiprocessing import Pool, set_start_method
 import librosa
 from tqdm import tqdm
 import json
@@ -74,9 +74,12 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=4):
 
 
 if __name__ == "__main__":
-    preprocess_raw("AISHELL-3", "/work/u5550322/AISHELL-3", "/work/u5550322/fscl/AISHELL-3")
-    preprocess_raw("CSS10", "/work/u5550322/CSS10/german", "/work/u5550322/fscl/CSS10/german")
-    preprocess_raw("JSUT", "/work/u5550322/jsut_ver1.1", "/work/u5550322/fscl/JSUT")
-    preprocess_raw("KSS", "/work/u5550322/kss", "/work/u5550322/fscl/kss")
-    preprocess_raw("LibriTTS", "/work/u5550322/LibriTTS", "/work/u5550322/fscl/LibriTTS")
-    preprocess_raw("GlobalPhone", "/work/u5550322/GlobalPhone/French", "/work/u5550322/fscl/GlobalPhone/french")
+    from sys import platform
+    if platform == "linux" or platform == "linux2":
+        set_start_method("spawn", force=True)
+    # preprocess_raw("AISHELL-3", "/work/Data/AISHELL-3", "./preprocessed_data/AISHELL-3")
+    # preprocess_raw("CSS10", "/work/Data/CSS10/german", "./preprocessed_data/CSS10/german")
+    # preprocess_raw("JSUT", "/work/Data/jsut_ver1.1", "./preprocessed_data/JSUT")
+    preprocess_raw("KSS", "/work/Data/kss", "./preprocessed_data/kss")
+    # preprocess_raw("LibriTTS", "/work/Data/LibriTTS", "./preprocessed_data/LibriTTS")
+    # preprocess_raw("GlobalPhone", "/work/Data/GlobalPhone/French", "./preprocessed_data/GlobalPhone/french")

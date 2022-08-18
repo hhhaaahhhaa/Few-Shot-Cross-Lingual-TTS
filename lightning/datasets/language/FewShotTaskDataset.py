@@ -10,16 +10,20 @@ from learn2learn.utils.lightning import EpisodicBatcher
 from lightning.collates import FSCLCollate, LanguageCollate
 
 
-def few_shot_task_dataset(_dataset, ways, shots, queries, n_tasks_per_label=-1, epoch_length=-1, type="spk", *args, **kwargs):
+def few_shot_task_dataset(_dataset, ways, shots, queries, n_tasks_per_label=-1, epoch_length=-1, type="spk", collate_cls=None, *args, **kwargs):
     """
         _dataset is already a `ConcatDataset`
     """
+    if collate_cls is not None:
+        _collate = collate_cls()
     if type == "spk":
         id2lb = get_multispeaker_id2lb(_dataset.datasets)
-        _collate = LanguageCollate()  # TODO: Change to speaker meta learning version
+        if collate_cls is None:
+            _collate = LanguageCollate()  # TODO: Change to speaker meta learning version
     else:
         id2lb = get_multilingual_id2lb(_dataset.datasets)
-        _collate = FSCLCollate()
+        if collate_cls is None:
+            _collate = FSCLCollate()
 
     meta_dataset = MetaDataset(_dataset, indices_to_labels=id2lb)
 

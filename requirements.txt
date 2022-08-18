@@ -1,4 +1,5 @@
 pytorch-lightning==1.6.2
+learn2learn >= 0.1.6
 comet-ml
 resemblyzer
 g2p-en

@@ -108,7 +108,7 @@ def reprocess_pr(data, idxs, mode="sup"):
     speakers = [data[idx]["speaker"] for idx in idxs]
     speakers = np.array(speakers)
 
-    texts = [data[idx]["text"] for idx in idxs]
+    texts = [data[idx]["expanded_text"] for idx in idxs]
     raw_texts = [data[idx]["raw_text"] for idx in idxs]
     text_lens = np.array([text.shape[0] for text in texts])
     texts = pad_1D(texts)

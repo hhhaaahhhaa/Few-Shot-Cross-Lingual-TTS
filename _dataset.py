@@ -8,7 +8,7 @@ import resemblyzer
 from resemblyzer.audio import preprocess_wav, wav_to_mel_spectrogram
 
 from text import text_to_sequence
-from utils.tools import pad_1D, pad_2D
+from lightning.utils.tools import pad_1D, pad_2D
 from preprocessor.reference_extractor import HubertExtractor, Wav2Vec2Extractor, XLSR53Extractor
 from preprocessor.utils import representation_average
 import Define

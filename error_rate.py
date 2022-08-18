@@ -1,90 +1,264 @@
-import numpy as np
 import pickle
-from tqdm import tqdm
+
+from dlhlp_lib.metrics.asr import FERCalculator, PERCalculator
+from dlhlp_lib.metrics.speech_segmentation import SegmentationEvaluator
 
 from Parsers.parser import DataParser
 
 
-def segment2duration(segment, fp):
-    res = []
-    for (s, e) in segment:
-        res.append(
-            int(
-                np.round(e * 1 / fp)
-                - np.round(s * 1 / fp)
-            )
-        )
-    return res
-
-
-def expand(seq, dur):
-    assert len(seq) == len(dur)
-    res = []
-    for (x, d) in zip(seq, dur):
-        if d > 0:
-            res.extend([x] * d)
-    return res
-
-
-class FERCalculator(object):
-    def __init__(self):
-        pass
-
-    def exec(self,
-            data_parser: DataParser, 
-            queries,
-            phoneme_featname1: str, segment_featname1: str, 
-            phoneme_featname2: str, segment_featname2: str,
-            symbol_equal_func,
-            fp: float
-        ) -> float:
-        phn_feat1 = data_parser.get_feature(phoneme_featname1)
-        seg_feat1 = data_parser.get_feature(segment_featname1)
-        phn_feat2 = data_parser.get_feature(phoneme_featname2)
-        seg_feat2 = data_parser.get_feature(segment_featname2)
-
-        n_frames, correct = 0, 0
-        n_seg1, n_seg2 = 0, 0
-        for query in tqdm(queries):
-            phoneme1 = phn_feat1.read_from_query(query).strip().split(" ")
-            segment1 = seg_feat1.read_from_query(query)
-            phoneme2 = phn_feat2.read_from_query(query).strip().split(" ")
-            segment2 = seg_feat2.read_from_query(query)
-
-            n_seg1 += len(phoneme1)
-            n_seg2 += len(phoneme2)
-
-            duration1, duration2 = segment2duration(segment1, fp), segment2duration(segment2, fp)
-            seq1, seq2 = expand(phoneme1, duration1), expand(phoneme2, duration2)
-            total_len = min(sum(duration1), sum(duration2))
-
-            for (x1, x2) in zip(seq1, seq2):
-                if symbol_equal_func(x1, x2):
-                    correct += 1
-            n_frames += total_len
-        fer = correct / n_frames
-
-        print(f"Segments: {n_seg1}, {n_seg2}.")
-        print(f"Frame error rate: {correct}/{n_frames} = {fer * 100:.2f}%")
-        return fer
-
-
 if __name__ == "__main__":
     calculator = FERCalculator()
+    # calculator = PERCalculator()
+    # calculator = SegmentationEvaluator()
     data_parser = DataParser("./preprocessed_data/JSUT")
     queries = data_parser.get_all_queries()
 
-    # Construct symbol mapping
+    # Construct symbol mapping for pseudo units
     with open("_data/JSUT/hubert-phoneme-4shot.pkl", 'rb') as f:
         table = pickle.load(f)
-    mapping = {str(i): p[1:] for i, p in enumerate(table)}
-    def equal_func(x1, x2):
-        return mapping[x1] == x2
+    unify_map1 = {str(i): p[1:] for i, p in enumerate(table)}
     
+    # Construct symbol mapping for pseudo units
+    # from text.define import LANG_ID2SYMBOLS
+    # unify_map1, unify_map2 = {}, {}
+    # for i, p in enumerate(LANG_ID2SYMBOLS[6]):  # jp
+    #     if len(p) < 2:
+    #         unify_map1[str(i)] = "none"
+    #     else:
+    #         unify_map1[str(i)] = p[1:]
+
+    from text.define import LANG_ID2SYMBOLS
+    unify_map2 = {}
+    for i, p in enumerate(LANG_ID2SYMBOLS[6]):  # jp
+        if len(p) < 2:
+            unify_map2[p] = p
+        else:
+            unify_map2[p[1:]] = p[1:]
+    
+    def equal_func(x1, x2):
+        return unify_map1[x1] == unify_map2[x2]
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/gtcent-hubert-reg10/phoneme", "ssl_units/gtcent-hubert-reg10/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     unify_map1, unify_map2,
+    #     fp=0.02
+    # )
+
     fer = calculator.exec(
         data_parser, queries, 
-        "ssl_units/gtcent-4shot-hubert-reg10/phoneme", "ssl_units/gtcent-4shot-hubert-reg10/dp_segment", 
+        "phoneme", "mfa_segment", 
         "phoneme", "mfa_segment",
-        equal_func,
+        unify_map2, unify_map2,
         fp=0.02
     )
+    input()
+
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/gtcent-hubert-reg10/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/gtcent-4shot-hubert-reg10/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-oracle-reg0/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-oracle-reg0.3/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-oracle-reg1/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune4-reg0/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune4-reg0.3/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune4-reg1/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune16-reg0/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune16-reg0.3/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune16-reg1/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune64-reg0/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune64-reg0.3/dp_segment",
+    )
+    result = calculator.exec(
+        data_parser, queries, 
+        "mfa_segment", "ssl_units/pr-ssl-baseline-tune64-reg1/dp_segment",
+    )
+    
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/gtcent-4shot-hubert-reg10/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-oracle-reg1/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-oracle-reg0.3/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-oracle-reg0/phoneme",
+    #     unify_map2, unify_map1
+    # )
+
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune4-reg1/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune4-reg0.3/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune4-reg0/phoneme",
+    #     unify_map2, unify_map1
+    # )
+
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune64-reg1/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune64-reg0.3/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    # wer = calculator.exec(
+    #     data_parser, queries, 
+    #     "phoneme", "ssl_units/pr-ssl-baseline-tune64-reg0/phoneme",
+    #     unify_map2, unify_map1
+    # )
+    
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune16-reg1/phoneme", "ssl_units/pr-ssl-baseline-tune16-reg1/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune16-reg0.3/phoneme", "ssl_units/pr-ssl-baseline-tune16-reg0.3/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune16-reg0/phoneme", "ssl_units/pr-ssl-baseline-tune16-reg0/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune4-reg1/phoneme", "ssl_units/pr-ssl-baseline-tune4-reg1/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune4-reg0.3/phoneme", "ssl_units/pr-ssl-baseline-tune4-reg0.3/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune4-reg0/phoneme", "ssl_units/pr-ssl-baseline-tune4-reg0/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune64-reg1/phoneme", "ssl_units/pr-ssl-baseline-tune64-reg1/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune64-reg0.3/phoneme", "ssl_units/pr-ssl-baseline-tune64-reg0.3/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-tune64-reg0/phoneme", "ssl_units/pr-ssl-baseline-tune64-reg0/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-oracle-reg1/phoneme", "ssl_units/pr-ssl-baseline-oracle-reg1/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-oracle-reg0.3/phoneme", "ssl_units/pr-ssl-baseline-oracle-reg0.3/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )
+
+    # fer = calculator.exec(
+    #     data_parser, queries, 
+    #     "ssl_units/pr-ssl-baseline-oracle-reg0/phoneme", "ssl_units/pr-ssl-baseline-oracle-reg0/dp_segment", 
+    #     "phoneme", "mfa_segment",
+    #     equal_func,
+    #     fp=0.02
+    # )

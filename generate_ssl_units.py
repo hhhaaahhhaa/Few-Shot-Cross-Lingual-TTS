@@ -108,13 +108,10 @@ class CodebookPostnet(pl.LightningModule):
 
 
 if __name__ == "__main__":
-    extractor = getattr(hub, 'hubert_large_ll60k')().cuda()
-    extractor.eval()
     # codebook_postnet = CodebookPostnet(
     #     system_type="semi-fscl",
     #     ckpt_path="output/ckpt/fscl/fa354467dffc4d8b843764069974a191/checkpoints/epoch=19-step=50000.ckpt"
     # ).cuda()
-    # dpdp = DPDP(extractor, layer=24, fp=20, norm=False, postnet=None)
     dpdp = DPDPSSLUnit('hubert_large_ll60k', layer=24, postnet=None)
     dpdp.cuda()
 

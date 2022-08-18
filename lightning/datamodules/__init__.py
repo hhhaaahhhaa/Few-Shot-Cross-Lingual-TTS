@@ -26,6 +26,8 @@ DATA_MODULE = {
     "multilingual-baseline-tune": language.FastSpeech2TuneDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline-tune": phoneme_recognition.SSLPRDataModule,
+    "pr-fscl": phoneme_recognition.FSCLDataModule,
+    "pr-fscl-tune": phoneme_recognition.SSLPRDataModule,
 }
 
 def get_datamodule(algorithm):

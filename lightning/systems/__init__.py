@@ -1,3 +1,4 @@
+from .phoneme_recognition.TransHeadTune import TransHeadTuneSystem
 from . import language
 from . import phoneme_recognition
 
@@ -22,7 +23,9 @@ SYSTEM = {
     "multilingual-baseline": language.BaselineSystem,
     "multilingual-baseline-tune": language.BaselineTuneSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
-    "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem
+    "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem,
+    "pr-fscl": phoneme_recognition.TransHeadSystem,
+    "pr-fscl-tune": phoneme_recognition.TransHeadTuneSystem,
 }
 
 def get_system(algorithm):
