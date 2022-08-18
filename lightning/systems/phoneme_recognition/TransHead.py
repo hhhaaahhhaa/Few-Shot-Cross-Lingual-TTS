@@ -97,6 +97,10 @@ class TransHeadSystem(AdaptorSystem):
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
         labels[3] = labels[3][:, :repr_info["len"]]
 
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
+
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
         self.log_dict(loss_dict, sync_dist=True)
@@ -107,6 +111,10 @@ class TransHeadSystem(AdaptorSystem):
         labels = list(qry_batch[0])
         val_loss, predictions = self.common_step(batch, batch_idx)
         labels[3] = labels[3][:, :repr_info["len"]]
+
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}

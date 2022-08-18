@@ -89,7 +89,7 @@ class MultiHeadAttentionCodebook(nn.Module):
             attn_weights: Tensor with shape (B, nH, L_q, v_dim // nH).
         """
         B = query.shape[0]
-        q = self.q_linear(query).view(B, -1, self.num_heads, self.q_dim // self.num_heads)
+        q = self.q_linear(query).view(B, -1, self.num_heads, self.v_dim // self.num_heads)
         q = q.transpose(1, 2).contiguous()  # B, nH, L_q, v_dim // nH
         k = self.k_banks.view(-1, self.num_heads, self.v_dim // self.num_heads)
         k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1, nH, codebook_size, v_dim // nH
@@ -132,7 +132,8 @@ class SoftAttCodebook(pl.LightningModule):
         Return:
             Return tensor with shape (B, L, d_out)
         """
-        weighted_sum = F.softmax(self.weight_raw, dim=2) * repr  # B, L, d_in
+        weighted_sum = F.softmax(self.weight_raw, dim=2) * repr
+        weighted_sum = weighted_sum.sum(dim=2)  # B, L, d_in
         x, _ = self.attention(weighted_sum)  # B, L, d_out
 
         return x

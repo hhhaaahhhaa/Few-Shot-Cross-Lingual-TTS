@@ -75,8 +75,8 @@ class PhonemeQueryExtractor(pl.LightningModule):
         phn_query = self.reduction(list(range(n_symbols)), table, dims)
         phn_query = phn_query.unsqueeze(0)  # 1, n_symbols, layer, dim
         if Define.DEBUG:
-            self.log("Phoneme query shape:")
-            self.log(phn_query.shape)
+            print("Phoneme query shape:")
+            print(phn_query.shape)
         return phn_query
 
 

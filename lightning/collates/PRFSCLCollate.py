@@ -68,6 +68,7 @@ class FSCLCollate(object):
             repr_info["lang_id"] = lang_id
 
             repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
+            repr_info["phonemes"] = [data[idx]["text"] for idx in idxs]
             repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idxs]
             # calc_ref = time.time() - st1
 
