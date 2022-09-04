@@ -236,9 +236,13 @@ class SSLUnitFSCLDataset(Dataset):
         self.unit_name = config["unit_name"]
         self.unit_parser = self.data_parser.ssl_units[self.unit_name]
 
-        with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
-            kmeans_model = pickle.load(f)
-            self.n_clusters = kmeans_model.cluster_centers_.shape[0]
+        try:
+            with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
+                kmeans_model = pickle.load(f)
+                self.n_clusters = kmeans_model.cluster_centers_.shape[0]
+        except:
+            self.n_clusters = 0
+        
         if self.map2phoneme:
             with open(f"{self.unit_parser.root}/centroids2phoneme.pkl", "rb") as f:
                 pairs = pickle.load(f)

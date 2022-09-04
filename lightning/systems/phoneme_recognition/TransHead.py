@@ -89,7 +89,49 @@ class TransHeadSystem(AdaptorSystem):
         output = F.linear(x, head_weights, bias=self.trans_head_bias)
         loss = self.loss_func(labels, output)
 
+        return loss, 
+        
+    def common_step_new(self, batch, batch_idx, train=True):
+        if Define.DEBUG:
+            print("Generate head weights... ")
+        head_weights = self.build_head_weights(batch)
+
+        _, qry_batch, repr_info, _ = batch[0]
+        labels = list(qry_batch[0])
+        ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+        ssl_repr = self._match_length(ssl_repr, labels[5])
+        ssl_repr = ssl_repr.detach()
+
+        repr_info["len"] = labels[5]
+        # if Define.DEBUG:
+        #     print(ssl_repr.shape)
+        #     print(labels[3].shape)
+
+        x = self.downstream(ssl_repr, labels[4].cpu())
+
+        # TransHead          
+        output = F.linear(x, head_weights, bias=self.trans_head_bias)
+        loss = self.loss_func(labels, output)
+
         return loss, output
+
+    # Origin Author: Daniel Lin
+    def _match_length(self, inputs, target_len: int):
+        """
+        Since the upstream extraction process can sometimes cause a mismatch
+        between the seq lenth of inputs and labels:
+        - if len(inputs) > len(labels), we truncate the final few timestamp of inputs to match the length of labels
+        - if len(inputs) < len(labels), we duplicate the last timestep of inputs to match the length of labels
+        Note that the length of labels should never be changed.
+        Input is always SSL feature with shape (B, L, *dim).
+        """
+        input_len, label_len = inputs.size(1), target_len
+        if input_len > label_len:
+            inputs = inputs[:, :label_len, :]
+        elif input_len < label_len:
+            pad_vec = inputs[:, -1, :].unsqueeze(1)  # (batch_size, 1, *dim)
+            inputs = torch.cat((inputs, pad_vec.repeat(1, label_len-input_len, 1)), dim=1)  # (batch_size, seq_len, *dim), where seq_len == target_len
+        return inputs
 
     def training_step(self, batch, batch_idx):
         _, qry_batch, repr_info, _ = batch[0]

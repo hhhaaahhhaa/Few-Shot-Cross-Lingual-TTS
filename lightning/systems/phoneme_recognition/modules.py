@@ -33,16 +33,22 @@ class BiLSTMDownstream(nn.Module):
         self.lstm = nn.LSTM(input_size=self.d_out, hidden_size=self.d_out // 2, 
                                 num_layers=2, bidirectional=True, batch_first=True)
 
-    def forward(self, repr):
+    def forward(self, repr, lengths):
         """
         Args:
             repr: SSL representation with shape (B, L, n_layers, d_in).
+            lens: Handle padding for LSTM.
         Return:
             Return tensor with shape (B, L, d_out)
         """
         weighted_sum = F.softmax(self.weight_raw, dim=2) * repr  # B, L, d_in
         x = self.proj(weighted_sum.sum(dim=2))  # B, L, d_out
+
+        # total length should be record due to data parallelism issue (https://pytorch.org/docs/stable/notes/faq.html#pack-rnn-unpack-with-data-parallelism)
+        total_length = x.size(1)
+        x = nn.utils.rnn.pack_padded_sequence(x, lengths, batch_first=True, enforce_sorted=False)
         x, _ = self.lstm(x)  # B, L, d_out
+        x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True, total_length=total_length)
 
         return x
 
@@ -112,11 +118,12 @@ class SoftAttCodebook(pl.LightningModule):
         self.codebook_size = self.codebook_config["size"]
         self.d_word_vec = model_config["transformer"]["encoder_hidden"]
         self.num_heads = 4
-        self.d_feat = Define.UPSTREAM_DIM
+        self.d_feat = upstream_dim
 
         self.emb_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
 
         # specific layer, fix weight_raw during training.
+        self.weight_raw = nn.Parameter(torch.zeros(1, 1, 25, 1))
         if specific_layer is not None:
             weights = torch.ones(1, 1, n_in_layers, 1) * float('-inf')
             weights[0][0][specific_layer][0] = 10.0

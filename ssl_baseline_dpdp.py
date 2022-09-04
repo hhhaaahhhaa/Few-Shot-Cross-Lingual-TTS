@@ -4,8 +4,6 @@ import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from tqdm import tqdm
-import s3prl.hub as hub
-import time
 
 from lightning.systems import get_system
 
@@ -41,17 +39,17 @@ class SSLPRModel(pl.LightningModule):
             repr: Tensor with shape [bs, L, layer, dim].
         """
         repr = repr.to(self.device)
-        x = self.pr_model.downstream(repr)
+        x = self.pr_model.downstream(repr, [repr.size(1)])
         output = self.pr_model.head(x, lang_id=lang_id)  # bs, L, n_symbols
         output = F.softmax(output, dim=2)
         return output
 
 
-class SSLPRPostNet(pl.LightningModule):
+class PostNetWrapper(pl.LightningModule):
     """
-    Postnet wrapper of SSLPRModel for DPDP algorithm.
+    Postnet wrapper of PR models for DPDP algorithm.
     """
-    def __init__(self, model: SSLPRModel, lang_id: int) -> None:
+    def __init__(self, model, lang_id: int) -> None:
         super().__init__()
         self.model = model
         self.lang_id = lang_id
@@ -78,8 +76,8 @@ def generate_ssl_units(unit_name: str, root: str, dpdp: DPDPSSLUnit, lambd=1):
             phoneme = [str(phn) for phn in phoneme]
             phoneme_feat.save(" ".join(phoneme), query)
         except:
-            raise
             print(query)
+            raise
 
     # Other preprocessing
     segment2duration_mp(unit_parser, queries, "dp_segment", "dp_duration", INV_FRAME_PERIOD, n_workers=os.cpu_count() // 2, refresh=True)
@@ -92,22 +90,23 @@ if __name__ == "__main__":
     Define.set_upstream("hubert")
     pr_model = SSLPRModel(
         system_type="pr-ssl-baseline-tune",
+        ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
+        # ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
         # ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
         # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
-        # ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
-        ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
     )
-    pr_model = SSLPRPostNet(pr_model, lang_id=6).eval().cuda()
+    pr_model = PostNetWrapper(pr_model, lang_id=6).eval().cuda()
     dpdp = DPDPSSLUnit('hubert_large_ll60k', postnet=pr_model)
     dpdp.cuda()
 
-    # ========= debug section =============
-    # dpdp.debug = True
-    # generate_ssl_units("pr-debug", "./preprocessed_data/JSUT", dpdp)
-    # dpdp.debug = False
-    # ========= debug section =============
-    
-    # dpdp.debug = True
-    generate_ssl_units("pr-ssl-baseline-tune16-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
-    generate_ssl_units("pr-ssl-baseline-tune16-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
-    generate_ssl_units("pr-ssl-baseline-tune16-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
+    # generate_ssl_units("pr-ssl-baseline-tune4-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
+    # generate_ssl_units("pr-ssl-baseline-tune4-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
+    # generate_ssl_units("pr-ssl-baseline-tune4-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
+   
+    # generate_ssl_units("pr-ssl-baseline-tune16-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
+    # generate_ssl_units("pr-ssl-baseline-tune16-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
+    # generate_ssl_units("pr-ssl-baseline-tune16-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
+
+    generate_ssl_units("pr-fscl-tune64-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
+    generate_ssl_units("pr-fscl-tune64-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
+    generate_ssl_units("pr-fscl-tune64-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)

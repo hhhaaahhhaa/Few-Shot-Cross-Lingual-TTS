@@ -146,7 +146,8 @@ class SSLPRDataset(Dataset):
         sample = {
             "id": basename,
             "speaker": speaker_id,
-            "text": expanded_text,
+            "text": text,
+            "expanded_text": expanded_text,
             "raw_text": raw_text,
             "wav": raw_feat,
             "duration": duration,

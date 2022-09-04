@@ -106,4 +106,4 @@ class FastSpeech2Dataset(Dataset):
 class NoisyFastSpeech2Dataset(FastSpeech2Dataset):
     def __init__(self, filename, data_parser: DataParser, config, spk_refer_wav=False):
         super().__init__(filename, data_parser, config, spk_refer_wav)
-        self.p_noise = 0.3
+        self.p_noise = 0.1  # Manually change

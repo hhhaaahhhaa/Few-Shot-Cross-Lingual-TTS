@@ -213,7 +213,7 @@ def generate_reference(path, data_parser: DataParser, lang_id):
         "n_symbols": len(LANG_ID2SYMBOLS[lang_id]),
         "avg-frames": [],
         "raw-feat": [],
-        "texts": [],
+        "phonemes": [],
     }
     queries = read_queries_from_txt(path)[:64]
     for query in tqdm(queries):
@@ -240,6 +240,27 @@ def generate_reference(path, data_parser: DataParser, lang_id):
         phns = data_parser.phoneme.read_from_query(query)
         phns = f"{{{phns}}}"  # match input format of text_to_sequence()
         phone = np.array(text_to_sequence(phns, ["basic_cleaners"], lang_id))
-        info["texts"].append(phone)
+        info["phonemes"].append(phone)
 
     return info
+
+
+# Origin Author: Daniel Lin
+def ssl_match_length(inputs, target_len: int):
+    """
+    Since the upstream extraction process can sometimes cause a mismatch
+    between the seq lenth of inputs and labels:
+    - if len(inputs) > len(labels), we truncate the final few timestamp of inputs to match the length of labels
+    - if len(inputs) < len(labels), we duplicate the last timestep of inputs to match the length of labels
+    Note that the length of labels should never be changed.
+    Input is always SSL feature with shape (B, L, *dim).
+    """
+    factors = [1] * inputs.dim()
+    input_len, label_len = inputs.size(1), target_len
+    if input_len > label_len:
+        inputs = inputs[:, :label_len, :]
+    elif input_len < label_len:
+        pad_vec = inputs[:, -1, :].unsqueeze(1)  # (batch_size, 1, *dim)
+        factors[1] = label_len - input_len
+        inputs = torch.cat((inputs, pad_vec.repeat(*factors)), dim=1)  # (batch_size, seq_len, *dim), where seq_len == target_len
+    return inputs

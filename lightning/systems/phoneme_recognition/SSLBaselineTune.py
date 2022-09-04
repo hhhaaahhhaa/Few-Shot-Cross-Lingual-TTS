@@ -10,6 +10,7 @@ from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
 from .modules import BiLSTMDownstream, MultilingualPRHead
+from lightning.utils.tool import ssl_match_length
 
 
 class SSLBaselineTuneSystem(System):
@@ -46,22 +47,18 @@ class SSLBaselineTuneSystem(System):
     
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
-        labels = list(labels)
+
         ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
-        if ssl_repr.shape[1] < labels[5]:
-            ssl_repr = ssl_repr.detach()
-            labels[3] = labels[3][:, :ssl_repr.shape[1]]
-            repr_info["len"] = ssl_repr.shape[1]
-        else:
-            ssl_repr = ssl_repr[:, :labels[5]].detach()  # Reduce to the same size as labels, dirty
-            repr_info["len"] = labels[5]
-        # if Define.DEBUG:
-        #     print(ssl_repr.shape)
-        #     print(labels[3].shape)
-        
-        x = self.downstream(ssl_repr)
+        ssl_repr = ssl_match_length(ssl_repr, labels[5])
+        ssl_repr = ssl_repr.detach()
+
+        if Define.DEBUG:
+            print(ssl_repr.shape)
+            print(labels[3].shape)
+
+        x = self.downstream(ssl_repr, labels[4].cpu())
+       
         output = self.head(x, lang_id=repr_info["lang_id"])
-    
         loss = self.loss_func(labels, output)
 
         return loss, output

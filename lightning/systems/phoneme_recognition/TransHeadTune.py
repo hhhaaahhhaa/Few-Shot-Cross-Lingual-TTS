@@ -11,6 +11,7 @@ import Define
 from text.define import LANG_ID2SYMBOLS
 from .modules import BiLSTMDownstream, SoftAttCodebook
 from lightning.model.reduction import PhonemeQueryExtractor
+from lightning.utils.tool import generate_reference, ssl_match_length
 
 
 class TransHeadTuneSystem(System):
@@ -31,54 +32,79 @@ class TransHeadTuneSystem(System):
         )
         self.trans_head_bias = nn.Parameter(torch.zeros(1))
 
+        # Tune init
+        self.lang_id = self.preprocess_config["lang_id"]
+        d_word_vec = self.model_config["transformer"]["encoder_hidden"]
+        self.head = nn.Linear(d_word_vec, len(LANG_ID2SYMBOLS[self.lang_id]))
+
         self.loss_func = SSLBaselineLoss()
 
         if Define.DEBUG:
             print(self)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.downstream, self.codebook])
+        return nn.ModuleList([self.head])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
         return saver
     
+    def tune_init(self, data_config):
+        from dlhlp_lib.utils import batchify
+
+        print("Generate reference...")
+        repr_info = generate_reference(
+            path=data_config["subsets"]["train"], 
+            data_parser=Define.DATAPARSERS[data_config["name"]],
+            lang_id=data_config["lang_id"]
+        )
+
+        self.cuda()
+        with torch.no_grad():
+            ssl_reprs = []
+            for wavs in batchify(repr_info["raw-feat"], batch_size=16):
+                ssl_repr, _ = self.upstream.extract(wavs)
+                ssl_reprs.extend([x for x in ssl_repr])
+            phoneme_queries = self.phoneme_query_extractor(ssl_reprs, repr_info["avg-frames"], repr_info)  # 1, n_symbols, n_layers, dim
+            print(phoneme_queries.shape)
+            head_weights = self.codebook(phoneme_queries).squeeze(0)  # n_symbols, dim
+            self.head.weight.copy_(head_weights)
+        for p in self.head.parameters():
+            p.requires_grad = True
+        self.cpu()
+        print("Generate reference done.")
+
+        # tune partial model
+        # for p in self.head.parameters():
+        #     p.requires_grad = False
+        # for p in self.downstream.parameters():
+        #     p.requires_grad = False
+
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
-        labels = list(labels)
-        ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
-        with torch.no_grad():
-            phoneme_queries = self.phoneme_query_extractor(ssl_repr)  # 1, n_symbols, n_layers, dim
-        if ssl_repr.shape[1] < labels[5]:
-            ssl_repr = ssl_repr.detach()
-            labels[3] = labels[3][:, :ssl_repr.shape[1]]
-            repr_info["len"] = ssl_repr.shape[1]
-        else:
-            ssl_repr = ssl_repr[:, :labels[5]].detach()  # Reduce to the same size as labels, dirty
-            repr_info["len"] = labels[5]
-        
-        # if Define.DEBUG:
-        #     print(ssl_repr.shape)
-        #     print(labels[3].shape)
-        
-        x = self.downstream(ssl_repr)
 
-        # TransHead
-        head_weights = self.codebook(phoneme_queries).squeeze(0)  # n_symbols, dim
+        ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+        ssl_repr = ssl_match_length(ssl_repr, labels[5])
+        ssl_repr = ssl_repr.detach()
+
         if Define.DEBUG:
-            print("Head shape and gradient required: ", head_weights.shape)
-            print(head_weights.requires_grad)
-        output = F.linear(x, head_weights, bias=self.trans_head_bias)
-    
+            print(ssl_repr.shape)
+            print(labels[3].shape)
+
+        x = self.downstream(ssl_repr, labels[4].cpu())
+       
+        output = self.head(x)
         loss = self.loss_func(labels, output)
 
         return loss, output
 
     def training_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
-        labels[3] = labels[3][:, :repr_info["len"]]
+
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
@@ -87,9 +113,11 @@ class TransHeadTuneSystem(System):
 
     def validation_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         val_loss, predictions = self.common_step(batch, batch_idx)
-        labels[3] = labels[3][:, :repr_info["len"]]
+
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}

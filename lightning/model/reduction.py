@@ -61,7 +61,7 @@ class PhonemeQueryExtractor(pl.LightningModule):
         phonemes = info["phonemes"]
         table = {i: [] for i in range(n_symbols)}
 
-        B, _, *dims = representations.shape
+        _, *dims = representations[0].shape
         for phoneme, d_list, repr in zip(phonemes, avg_frames, representations):
             pos = 0
             for p, d in zip(phoneme, d_list):
