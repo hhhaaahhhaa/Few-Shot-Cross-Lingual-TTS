@@ -170,5 +170,37 @@ if __name__ == "__main__":
     decoder = Decoder('hubert_large_ll60k', postnet=pr_model)
     decoder.cuda()
     
-    generate_ssl_units("pr-ssl-baseline-tune4-reg0-seg-oracle", "./preprocessed_data/JSUT", f"mfa_segment", decoder)
-    generate_ssl_units("pr-ssl-baseline-tune4-reg0-seg-gtcent-4shot-hubert-reg10", "./preprocessed_data/JSUT", f"ssl_units/gtcent-4shot-hubert-reg10/dp_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-oracle", "./preprocessed_data/JSUT", f"mfa_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-gtcent-4shot-hubert-reg10", "./preprocessed_data/JSUT", f"ssl_units/gtcent-4shot-hubert-reg10/dp_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-gtcent-hubert-reg10", "./preprocessed_data/JSUT", f"ssl_units/gtcent-hubert-reg10/dp_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-oracle-reg0.3", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-oracle-reg0.3/dp_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-oracle-reg0", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-oracle-reg0/dp_segment", decoder)
+    # generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-tune4-reg0.3", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-tune4-reg0.3/dp_segment", decoder)
+
+    generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-tune4-reg0-unk", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-tune4-reg0-unk/dp_segment", decoder)
+    generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-tune16-reg0-unk", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-tune16-reg0-unk/dp_segment", decoder)
+    generate_ssl_units("pr-ssl-baseline-tune4-seg-pr-ssl-baseline-tune64-reg0-unk", "./preprocessed_data/JSUT", f"ssl_units/pr-ssl-baseline-tune64-reg0-unk/dp_segment", decoder)
+
+    # pr_model = SSLPRModel(
+    #     system_type="pr-ssl-baseline-tune",
+    #     # ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
+    #     ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
+    #     # ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
+    #     # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
+    # )
+    # pr_model = PostNetWrapper(pr_model, lang_id=6).eval().cuda()
+    # decoder = Decoder('hubert_large_ll60k', postnet=pr_model)
+    # decoder.cuda()
+    # generate_ssl_units("pr-ssl-baseline-tune16-seg-oracle", "./preprocessed_data/JSUT", f"mfa_segment", decoder)
+
+    # pr_model = SSLPRModel(
+    #     system_type="pr-ssl-baseline-tune",
+    #     # ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
+    #     # ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
+    #     ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
+    #     # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
+    # )
+    # pr_model = PostNetWrapper(pr_model, lang_id=6).eval().cuda()
+    # decoder = Decoder('hubert_large_ll60k', postnet=pr_model)
+    # decoder.cuda()
+    # generate_ssl_units("pr-ssl-baseline-tune64-seg-oracle", "./preprocessed_data/JSUT", f"mfa_segment", decoder)

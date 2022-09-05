@@ -60,24 +60,29 @@ if __name__ == "__main__":
         else:
             symbol_pred2unify[str(i)] = p[1:]
 
-    # Construct symbol mapping for pseudo units
-    # with open("_data/JSUT/hubert-phoneme-4shot.pkl", 'rb') as f:
-    #     table = pickle.load(f)
-    # symbol_pred2unify = {str(i): p[1:] for i, p in enumerate(table)}
-
     # ssl_baseline_dpdp experiments
     # for shots in ["tune4", "tune16", "tune64", "oracle"]:
     #     for lambd in ["0", "0.3", "1"]:
     #         evaluate_ssl_unit(data_parser, f"pr-ssl-baseline-{shots}-reg{lambd}", symbol_ref2unify, symbol_pred2unify)
     
     # ssl_fscl_dpdp experiments
-    # for shots in ["tune4", "tune16"]:
+    # for shots in ["tune4", "tune16", "tune64"]:
     #     for lambd in ["0", "0.3", "1"]:
     #         evaluate_ssl_unit(data_parser, f"pr-fscl-{shots}-reg{lambd}", symbol_ref2unify, symbol_pred2unify)
 
     # unit_ref_segment experiments
-    evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-reg0-seg-oracle", symbol_ref2unify, symbol_pred2unify)
-    evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-reg0-seg-gtcent-4shot-hubert-reg10", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-oracle", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-gtcent-4shot-hubert-reg10", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-gtcent-hubert-reg10", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-pr-ssl-baseline-oracle-reg0.3", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-pr-ssl-baseline-oracle-reg0", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-seg-pr-ssl-baseline-tune4-reg0.3", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune16-seg-oracle", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune64-seg-oracle", symbol_ref2unify, symbol_pred2unify)
+
+    evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune4-reg0-unk", symbol_ref2unify, symbol_pred2unify)
+    evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune16-reg0-unk", symbol_ref2unify, symbol_pred2unify)
+    evaluate_ssl_unit(data_parser, "pr-ssl-baseline-tune64-reg0-unk", symbol_ref2unify, symbol_pred2unify)
     
     # ssl_dpdp experiments
     # with open("_data/JSUT/hubert-phoneme-average.pkl", 'rb') as f:

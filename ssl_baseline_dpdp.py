@@ -58,6 +58,23 @@ class PostNetWrapper(pl.LightningModule):
         return 1 - self.model(repr, lang_id=self.lang_id)  # Generate score for dpdp
 
 
+class UnknownScoringPostNetWrapper(pl.LightningModule):
+    """
+    Postnet wrapper of PR models for DPDP algorithm + unknown score.
+    """
+    def __init__(self, model, lang_id: int) -> None:
+        super().__init__()
+        self.model = model
+        self.lang_id = lang_id
+
+    def forward(self, repr):
+        orig_score = self.model(repr, lang_id=self.lang_id)
+        score = 1 - orig_score  # Generate score for dpdp
+        score[:, :, 1] = torch.max(orig_score, dim=2)[0]
+
+        return score
+
+
 def generate_ssl_units(unit_name: str, root: str, dpdp: DPDPSSLUnit, lambd=1):
     data_parser = DataParser(root)
     data_parser.create_ssl_unit_feature(unit_name=unit_name)
@@ -95,18 +112,42 @@ if __name__ == "__main__":
         # ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
         # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
     )
-    pr_model = PostNetWrapper(pr_model, lang_id=6).eval().cuda()
+    pr_model = UnknownScoringPostNetWrapper(pr_model, lang_id=6).eval().cuda()
     dpdp = DPDPSSLUnit('hubert_large_ll60k', postnet=pr_model)
     dpdp.cuda()
 
     # generate_ssl_units("pr-ssl-baseline-tune4-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
     # generate_ssl_units("pr-ssl-baseline-tune4-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
-    # generate_ssl_units("pr-ssl-baseline-tune4-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
-   
+    # generate_ssl_units("pr-ssl-baseline-tune4-reg0-unk", "./preprocessed_data/JSUT", dpdp, lambd=0)
+    
+    pr_model = SSLPRModel(
+        system_type="pr-ssl-baseline-tune",
+        # ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
+        ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
+        # ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
+        # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
+    )
+    pr_model = UnknownScoringPostNetWrapper(pr_model, lang_id=6).eval().cuda()
+    dpdp = DPDPSSLUnit('hubert_large_ll60k', postnet=pr_model)
+    dpdp.cuda()
+    generate_ssl_units("pr-ssl-baseline-tune16-reg0-unk", "./preprocessed_data/JSUT", dpdp, lambd=0)
+    generate_ssl_units("pr-ssl-baseline-tune16-reg0.3-unk", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
     # generate_ssl_units("pr-ssl-baseline-tune16-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
     # generate_ssl_units("pr-ssl-baseline-tune16-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
     # generate_ssl_units("pr-ssl-baseline-tune16-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
 
-    generate_ssl_units("pr-fscl-tune64-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
-    generate_ssl_units("pr-fscl-tune64-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
-    generate_ssl_units("pr-fscl-tune64-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
+    pr_model = SSLPRModel(
+        system_type="pr-ssl-baseline-tune",
+        # ckpt_path="output/ckpt/tune/fscl/98e354d98ed448d7a6e406968e8dd93b/checkpoints/epoch=3-step=1000.ckpt"  # 4shot
+        # ckpt_path="output/ckpt/tune/fscl/3d8e23d06e404de7921ccce324ab697b/checkpoints/epoch=9-step=2500.ckpt"  # 16shot
+        ckpt_path="output/ckpt/tune/fscl/72acfc01c03a43b3a0844d07b2a26f01/checkpoints/epoch=39-step=10000.ckpt"  # 64shot
+        # ckpt_path="output/ckpt/tune/fscl/3939f48365ab4773bab43ce7b5b0ead3/checkpoints/epoch=39-step=10000.ckpt"  # 3000shot
+    )
+    pr_model = UnknownScoringPostNetWrapper(pr_model, lang_id=6).eval().cuda()
+    dpdp = DPDPSSLUnit('hubert_large_ll60k', postnet=pr_model)
+    dpdp.cuda()
+    generate_ssl_units("pr-ssl-baseline-tune64-reg0-unk", "./preprocessed_data/JSUT", dpdp, lambd=0)
+    generate_ssl_units("pr-ssl-baseline-tune64-reg0.3-unk", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
+    # generate_ssl_units("pr-fscl-tune64-reg1", "./preprocessed_data/JSUT", dpdp, lambd=1)
+    # generate_ssl_units("pr-fscl-tune64-reg0.3", "./preprocessed_data/JSUT", dpdp, lambd=0.3)
+    # generate_ssl_units("pr-fscl-tune64-reg0", "./preprocessed_data/JSUT", dpdp, lambd=0)
