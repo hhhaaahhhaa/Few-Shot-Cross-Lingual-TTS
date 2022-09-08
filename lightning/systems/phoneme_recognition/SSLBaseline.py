@@ -58,9 +58,7 @@ class SSLBaselineSystem(System):
 
     def training_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
-        labels[3] = labels[3][:, :repr_info["len"]]
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
@@ -69,9 +67,7 @@ class SSLBaselineSystem(System):
 
     def validation_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         val_loss, predictions = self.common_step(batch, batch_idx)
-        labels[3] = labels[3][:, :repr_info["len"]]
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}

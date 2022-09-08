@@ -2,25 +2,13 @@ import os
 import json
 from typing import Dict
 
+from dlhlp_lib.parsers.Interfaces import BaseDataParser
 from dlhlp_lib.parsers.Feature import Feature
 from dlhlp_lib.parsers.QueryParsers import SFQueryParser, NestSFQueryParser
 from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO
 
 
-
-class BaseParser(object):
-    def __init__(self, root):
-        self.root = root
-        self._init_structure()
-
-    def _init_structure(self):
-        raise NotImplementedError
-
-    def get_feature(self, query: str) -> Feature:
-        raise NotImplementedError
-
-
-class SSLUnitParser(BaseParser):
+class SSLUnitParser(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
@@ -46,7 +34,7 @@ class SSLUnitParser(BaseParser):
         return getattr(self, query)
 
 
-class DataParser(BaseParser):
+class DataParser(BaseDataParser):
 
     ssl_units: Dict[str, SSLUnitParser]
 

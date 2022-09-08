@@ -217,13 +217,17 @@ def main(args, configs):
     elif args.stage == 'tune':
         # Get model
         system = get_system(algorithm_config["type"])
-        assert pretrain_ckpt_file is not None
-        # assert len(preprocess_configs) == 1  # transfer one language at a time
-        model = system.load_from_checkpoint(
-            pretrain_ckpt_file,
-            preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
-            log_dir=log_dir, result_dir=result_dir
-        )
+        if pretrain_ckpt_file is not None:
+            model = system.load_from_checkpoint(
+                pretrain_ckpt_file,
+                preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
+                log_dir=log_dir, result_dir=result_dir
+            )
+        else:
+            model = system(
+                preprocess_configs[0], model_config, train_config, algorithm_config,
+                log_dir, result_dir
+            )
         if "semi" in algorithm_config["type"]:
             # model.tune_init(data_configs["sup"][0])
             model.tune_init(config_reader.read("_data/JSUT/4-shot/task-0"))

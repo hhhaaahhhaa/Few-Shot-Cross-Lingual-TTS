@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 import Define
 from lightning.collates import TextCollate, SSLPRCollate
 from lightning.datasets.language import TextDataset
-from lightning.datasets.phoneme_recognition import SSLPRDataset
+from lightning.datasets.phoneme_recognition import SSLPRDataset, SSLUnitPseudoLabelDataset, SSLUnitFSCLDataset
 from lightning.datasets.phoneme_recognition.MultiTaskSampler import MultiTaskSampler, CustomSamplerDataset
 from lightning.datamodules.utils import EpisodicInfiniteWrapper
 
@@ -35,6 +35,8 @@ class SSLPRDataModule(pl.LightningDataModule):
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
                 self.dataset_cls(
+                # SSLUnitPseudoLabelDataset(
+                # SSLUnitFSCLDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config

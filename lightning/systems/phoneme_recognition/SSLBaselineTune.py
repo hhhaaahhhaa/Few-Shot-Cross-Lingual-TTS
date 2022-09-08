@@ -32,18 +32,19 @@ class SSLBaselineTuneSystem(System):
             print(self)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.head])
+        return nn.ModuleList([self.downstream, self.head])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
         return saver
 
     # Tune Interface
-    def tune_init(self):
+    def tune_init(self, *args, **kwargs):
         # Freeze part of the model
         # self.model.freeze()
         self.lang_id = self.preprocess_config["lang_id"]
         print("Current language: ", self.lang_id)
+        # self.head.heads[f"head-{self.lang_id}"] = nn.Linear(self.head.d_in, len(LANG_ID2SYMBOLS[self.lang_id]))  # dirty
     
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
@@ -65,9 +66,7 @@ class SSLBaselineTuneSystem(System):
 
     def training_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
-        labels[3] = labels[3][:, :repr_info["len"]]
 
         mask = (labels[3] != 0)
         acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
@@ -80,9 +79,7 @@ class SSLBaselineTuneSystem(System):
 
     def validation_step(self, batch, batch_idx):
         labels, repr_info = batch
-        labels = list(labels)
         val_loss, predictions = self.common_step(batch, batch_idx)
-        labels[3] = labels[3][:, :repr_info["len"]]
 
         mask = (labels[3] != 0)
         acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
