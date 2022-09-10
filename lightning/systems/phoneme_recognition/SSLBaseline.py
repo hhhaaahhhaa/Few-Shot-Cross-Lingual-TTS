@@ -57,6 +57,10 @@ class SSLBaselineSystem(System):
         labels, repr_info = batch
         train_loss, predictions = self.common_step(batch, batch_idx, train=True)
 
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
+
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
         self.log_dict(loss_dict, sync_dist=True)
@@ -65,6 +69,10 @@ class SSLBaselineSystem(System):
     def validation_step(self, batch, batch_idx):
         labels, repr_info = batch
         val_loss, predictions = self.common_step(batch, batch_idx)
+
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
