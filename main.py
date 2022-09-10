@@ -49,18 +49,18 @@ def main(args, configs):
 
     #====== Parsing original format to general format ======
     # TODO: Tune and training currently are using different config format.
-    # data_configs = []
-    # for prep in preprocess_configs:
-    #     parse_prep = {
-    #         "name": prep["dataset"],
-    #         "lang_id": prep["lang_id"],
-    #         "unit_name": prep.get("unit_name", ""),
-    #         "data_dir": prep["path"]["preprocessed_path"], 
-    #         "subsets": prep["subsets"],
-    #         "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
-    #     }
-    #     data_configs.append(parse_prep)
-    data_configs = preprocess_configs
+    data_configs = []
+    for prep in preprocess_configs:
+        parse_prep = {
+            "name": prep["dataset"],
+            "lang_id": prep["lang_id"],
+            "unit_name": prep.get("unit_name", ""),
+            "data_dir": prep["path"]["preprocessed_path"], 
+            "subsets": prep["subsets"],
+            "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
+        }
+        data_configs.append(parse_prep)
+    # data_configs = preprocess_configs
 
     # register parsers, merge normalization stats
     import json
@@ -307,12 +307,12 @@ if __name__ == "__main__":
     print(f"Task {args.index_exp}, Layer {args.layer_exp}, Upstream {args.upstream_exp}...")
 
     # Read Config. TODO: Tune and training currently are using different config format.
-    # preprocess_configs = [
-    #     yaml.load(open(path, "r"), Loader=yaml.FullLoader)
-    #     for path in args.preprocess_config
-    # ]
-    config_reader = LanguageDataConfigReader()
-    preprocess_configs = [config_reader.read(path) for path in args.preprocess_config]
+    preprocess_configs = [
+        yaml.load(open(path, "r"), Loader=yaml.FullLoader)
+        for path in args.preprocess_config
+    ]
+    # config_reader = LanguageDataConfigReader()
+    # preprocess_configs = [config_reader.read(path) for path in args.preprocess_config]
     model_config = yaml.load(
         open(args.model_config, "r"), Loader=yaml.FullLoader
     )

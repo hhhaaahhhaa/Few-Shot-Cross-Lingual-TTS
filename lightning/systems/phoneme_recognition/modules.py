@@ -1,16 +1,13 @@
-from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from typing import List
+from typing import List, Dict
 
 import Define
-from ...model.reference_extractor import AverageReprModule
 from text.define import LANG_ID2SYMBOLS
 from transformer.Modules import MultiheadAttention
 from Objects.visualization import MatchingGraphInfo
-from lightning.utils.tool import torch_exist_nan
 
 
 class BiLSTMDownstream(nn.Module):
@@ -66,6 +63,29 @@ class MultilingualPRHead(nn.Module):
 
     def forward(self, x, lang_id: int):
         return self.heads[f"head-{lang_id}"](x)
+
+    
+class MultilingualClusterHead(nn.Module):
+    def __init__(self, lang_id2symbols: Dict[str, int], d_in: int, temperature=0.1):
+        super().__init__()
+        self.lang_id2symbols = lang_id2symbols
+        self.d_in = d_in
+        self.temperature = temperature
+
+        self.clusters = nn.ParameterDict()
+        for lang_id, v in lang_id2symbols.items():
+            if len(v) > 0:
+                self.clusters[f"head-{lang_id}"] = nn.Parameter(torch.randn(len(v), d_in))
+
+    def forward(self, x, lang_id: int):
+        """
+        Args:
+            x: Tensor with shape (B, L, d_in), which should be a time sequence.
+        Return:
+            Tensor with shape (B, L, n_c), calculate cosine similarity between centers and input as Hubert and wav2vec2.0.
+        """
+        sim = F.cosine_similarity(self.clusters[f"head-{lang_id}"].unsqueeze(0).unsqueeze(0), x.unsqueeze(2), dim=3)  # B, L, n_c
+        return sim / self.temperature
 
 
 class MultiHeadAttentionCodebook(nn.Module):
@@ -175,3 +195,18 @@ class SoftAttCodebook(pl.LightningModule):
             infos.append(weight_info)
         return infos
 
+
+"""
+Loss function
+"""
+class PRFramewiseLoss(nn.Module):
+    """ Cross Entropy Loss """
+
+    def __init__(self):
+        super().__init__()
+        self.loss = nn.CrossEntropyLoss(ignore_index=0)
+
+    def forward(self, labels, preds):
+        preds = preds.transpose(1, 2)  # B, N, L
+        target = labels[3]  # B, L
+        return self.loss(preds, target)

@@ -9,7 +9,7 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-from .modules import BiLSTMDownstream, MultilingualPRHead
+from .modules import BiLSTMDownstream, MultilingualPRHead, MultilingualClusterHead, PRFramewiseLoss
 from lightning.utils.tool import ssl_match_length
 
 
@@ -26,13 +26,13 @@ class SSLBaselineTuneSystem(System):
         self.upstream.freeze()
         self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
         self.head = MultilingualPRHead(LANG_ID2SYMBOLS, 256)
-        self.loss_func = SSLBaselineLoss()
+        self.loss_func = PRFramewiseLoss()
 
         if Define.DEBUG:
             print(self)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.downstream, self.head])
+        return nn.ModuleList([self.head])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
@@ -91,14 +91,21 @@ class SSLBaselineTuneSystem(System):
         return {'losses': val_loss, 'output': predictions, '_batch': labels, 'lang_id': repr_info["lang_id"]}
 
 
-class SSLBaselineLoss(nn.Module):
-    """ Cross Entropy Loss """
+class SSLClusterTuneSystem(SSLBaselineTuneSystem):
+    """
+    This class only replace the MultilingualPRHead with MultilingualClusterHead.
+    I wish to prove that cluster head results in better representation and more compatible with DPDP.
+    In fact this system should NOT require any fine-tuning.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def build_model(self):
+        self.upstream = S3PRLExtractor("hubert_large_ll60k")
+        self.upstream.freeze()
+        self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
+        self.head = MultilingualClusterHead(LANG_ID2SYMBOLS, 256)
+        self.loss_func = PRFramewiseLoss()
 
-    def __init__(self):
-        super().__init__()
-        self.loss = nn.CrossEntropyLoss(ignore_index=0)
-
-    def forward(self, labels, preds):
-        preds = preds.transpose(1, 2)  # B, N, L
-        target = labels[3]  # B, L
-        return self.loss(preds, target)
+        if Define.DEBUG:
+            print(self)

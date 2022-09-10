@@ -9,7 +9,7 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-from .modules import BiLSTMDownstream, SoftAttCodebook
+from .modules import BiLSTMDownstream, SoftAttCodebook, PRFramewiseLoss
 from lightning.model.reduction import PhonemeQueryExtractor
 
 
@@ -31,7 +31,7 @@ class TransHeadSystem(AdaptorSystem):
         )
         self.trans_head_bias = nn.Parameter(torch.zeros(1))
 
-        self.loss_func = SSLBaselineLoss()
+        self.loss_func = PRFramewiseLoss()
 
         if Define.DEBUG:
             print(self)
@@ -162,16 +162,3 @@ class TransHeadSystem(AdaptorSystem):
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
         self.log_dict(loss_dict, sync_dist=True)
         return {'losses': val_loss, 'output': predictions, '_batch': labels, 'lang_id': repr_info["lang_id"]}
-
-
-class SSLBaselineLoss(nn.Module):
-    """ Cross Entropy Loss """
-
-    def __init__(self):
-        super().__init__()
-        self.loss = nn.CrossEntropyLoss(ignore_index=0)
-
-    def forward(self, labels, preds):
-        preds = preds.transpose(1, 2)  # B, N, L
-        target = labels[3]  # B, L
-        return self.loss(preds, target)
