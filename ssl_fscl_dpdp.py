@@ -77,7 +77,7 @@ def generate_ssl_units(unit_name: str, root: str, dpdp: DPDPSSLUnit, lambd=1):
             phoneme_feat.save(" ".join(phoneme), query)
         except:
             print(query)
-            raise
+            continue
 
     # Other preprocessing
     segment2duration_mp(unit_parser, queries, "dp_segment", "dp_duration", INV_FRAME_PERIOD, n_workers=os.cpu_count() // 2, refresh=True)

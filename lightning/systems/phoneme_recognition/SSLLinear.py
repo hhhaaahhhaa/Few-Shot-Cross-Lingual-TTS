@@ -9,11 +9,14 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-from .modules import BiLSTMDownstream, MultilingualPRHead, MultilingualClusterHead, PRFramewiseLoss
+from .modules import MultilingualPRHead, MultilingualClusterHead, WeightedSumLayer, PRFramewiseLoss
 from lightning.utils.tool import ssl_match_length
 
 
-class SSLBaselineSystem(System):
+class SSLLinearTuneSystem(System):
+    """
+    Classical linear downstream evaluation.
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -21,8 +24,8 @@ class SSLBaselineSystem(System):
     def build_model(self):
         self.upstream = S3PRLExtractor("hubert_large_ll60k")
         self.upstream.freeze()
-        self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, 256)
+        self.downstream = WeightedSumLayer(n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
+        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, Define.UPSTREAM_DIM)
         self.loss_func = PRFramewiseLoss()
 
         if Define.DEBUG:
@@ -35,6 +38,13 @@ class SSLBaselineSystem(System):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
         return saver
 
+    # Tune Interface
+    def tune_init(self, *args, **kwargs):
+        # Freeze part of the model
+        # self.model.freeze()
+        self.lang_id = self.preprocess_config["lang_id"]
+        print("Current language: ", self.lang_id)
+        
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
 
@@ -47,7 +57,7 @@ class SSLBaselineSystem(System):
             print(ssl_repr.shape)
             print(labels[3].shape)
 
-        x = self.downstream(ssl_repr, labels[4].cpu())
+        x = self.downstream(ssl_repr, dim=2)
        
         output = self.head(x, lang_id=repr_info["lang_id"])
         loss = self.loss_func(labels, output)
@@ -79,22 +89,3 @@ class SSLBaselineSystem(System):
         loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
         self.log_dict(loss_dict, sync_dist=True)
         return {'losses': val_loss, 'output': predictions, '_batch': labels, 'lang_id': repr_info["lang_id"]}
-
-
-class SSLClusterSystem(SSLBaselineSystem):
-    """
-    This class only replace the MultilingualPRHead with MultilingualClusterHead.
-    I wish to prove that cluster head results in better representation and more compatible with DPDP.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-    def build_model(self):
-        self.upstream = S3PRLExtractor("hubert_large_ll60k")
-        self.upstream.freeze()
-        self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
-        self.head = MultilingualClusterHead(LANG_ID2SYMBOLS, 256)
-        self.loss_func = PRFramewiseLoss()
-
-        if Define.DEBUG:
-            print(self)

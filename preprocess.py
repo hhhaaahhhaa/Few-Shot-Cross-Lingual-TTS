@@ -22,12 +22,9 @@ def preprocess(root):
     trim_wav_by_mfa_segment_mp(data_parser, queries, sr=22050, n_workers=2, refresh=True)
     trim_wav_by_mfa_segment_mp(data_parser, queries, sr=16000, n_workers=2, refresh=False)
     wav_trim_22050_to_mel_energy_pitch_mp(data_parser, queries, n_workers=4)
-    # wav_trim_16000_to_unsup_seg(data_parser, queries)
     extract_spk_ref_mel_slices_from_wav_mp(data_parser, queries, sr=16000, n_workers=4)
     segment2duration_mp(data_parser, queries, "mfa_segment", "mfa_duration", INV_FRAME_PERIOD, n_workers=os.cpu_count() // 2, refresh=True)
-    # segment2duration_mp(data_parser, queries, "unsup_segment", "unsup_duration", INV_FRAME_PERIOD, n_workers=os.cpu_count() // 2, refresh=True)
     duration_avg_pitch_and_energy_mp(data_parser, queries, "mfa_duration", n_workers=os.cpu_count() // 2, refresh=True)
-    # duration_avg_pitch_and_energy_mp(data_parser, queries, "unsup_duration", n_workers=os.cpu_count() // 2, refresh=True)
     
     get_stats(data_parser, refresh=True)
 

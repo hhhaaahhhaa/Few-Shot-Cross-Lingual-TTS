@@ -83,6 +83,7 @@ class TransHeadTuneSystem(System):
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
 
+        self.upstream.eval()
         ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
         ssl_repr = ssl_match_length(ssl_repr, labels[5])
         ssl_repr = ssl_repr.detach()

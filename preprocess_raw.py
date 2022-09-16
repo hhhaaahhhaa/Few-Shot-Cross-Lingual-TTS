@@ -12,6 +12,7 @@ from Parsers.jsut import JSUTRawParser
 from Parsers.kss import KSSRawParser
 from Parsers.libritts import LibriTTSRawParser
 from Parsers.globalphone import GlobalPhoneRawParser
+from Parsers.TAT_TTS import TATTTSRawParser
 
 
 def wav_normalization(wav: np.array) -> np.array:
@@ -51,6 +52,8 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=4):
         raw_parser = LibriTTSRawParser(raw_root)
     elif parser_name == "GlobalPhone":
         raw_parser = GlobalPhoneRawParser(raw_root)
+    elif parser_name == "TATTTS":
+        raw_paerser = TATTTSRawParser(raw_root)
     else:
         raise NotImplementedError
 
@@ -80,6 +83,7 @@ if __name__ == "__main__":
     # preprocess_raw("AISHELL-3", "/work/Data/AISHELL-3", "./preprocessed_data/AISHELL-3")
     # preprocess_raw("CSS10", "/work/Data/CSS10/german", "./preprocessed_data/CSS10/german")
     # preprocess_raw("JSUT", "/work/Data/jsut_ver1.1", "./preprocessed_data/JSUT")
-    preprocess_raw("KSS", "/work/Data/kss", "./preprocessed_data/kss")
+    # preprocess_raw("KSS", "/work/Data/kss", "./preprocessed_data/kss")
     # preprocess_raw("LibriTTS", "/work/Data/LibriTTS", "./preprocessed_data/LibriTTS")
     # preprocess_raw("GlobalPhone", "/work/Data/GlobalPhone/French", "./preprocessed_data/GlobalPhone/french")
+    preprocess_raw("TATTTS", "/mnt/d/Data/TAT-TTS", "./preprocessed_data/TATTTS")

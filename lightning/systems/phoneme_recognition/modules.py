@@ -1,3 +1,4 @@
+from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -10,11 +11,58 @@ from transformer.Modules import MultiheadAttention
 from Objects.visualization import MatchingGraphInfo
 
 
+
+class WeightedSumLayer(nn.Module):
+    def __init__(self, n_in_layers: int, specific_layer: int=None) -> None:
+        super().__init__()
+        self.weight_raw = nn.Parameter(torch.randn(n_in_layers))
+        self.n_in_layers = n_in_layers
+            
+        # specific layer, fix weight_raw during training.
+        if specific_layer is not None:
+            weights = torch.ones(n_in_layers) * float('-inf')
+            weights[specific_layer] = 10.0
+            self.weight_raw = nn.Parameter(weights)
+            self.weight_raw.requires_grad = False
+
+    def forward(self, x, dim: int):
+        weight_shape = [1] * x.dim()
+        weight_shape[dim] = self.n_in_layers
+        weighted_sum = torch.reshape(F.softmax(self.weight_raw), tuple(weight_shape)) * x  # B, L, d_in
+        weighted_sum = weighted_sum.sum(dim=dim)
+        
+        return weighted_sum
+
+
+class LinearDownStream(nn.Module):
+    """
+    Weighted sum + Linear.
+    """
+    def __init__(self, n_in_layers: int, upstream_dim: int, d_out: int=256, specific_layer: int=None) -> None:
+        super().__init__()
+        self.weighted_sum = WeightedSumLayer(n_in_layers, specific_layer)
+
+        self.d_out = d_out
+        self.proj = nn.Linear(upstream_dim, self.d_out)
+
+    def forward(self, repr):
+        """
+        Args:
+            repr: SSL representation with shape (B, L, n_layers, d_in).
+        Return:
+            Return tensor with shape (B, L, d_out)
+        """
+        x = self.weighted_sum(repr, dim=2)
+        x = self.proj(x)  # B, L, d_out
+
+        return x
+
+
 class BiLSTMDownstream(nn.Module):
     """
     Weighted sum + BiLSTM.
     """
-    def __init__(self, n_in_layers: int, upstream_dim: int, specific_layer: int=None) -> None:
+    def __init__(self, n_in_layers: int, upstream_dim: int, d_out: int=256, specific_layer: int=None) -> None:
         super().__init__()
         self.weight_raw = nn.Parameter(torch.zeros(1, 1, n_in_layers, 1))
             
@@ -25,7 +73,7 @@ class BiLSTMDownstream(nn.Module):
             self.weight_raw = nn.Parameter(weights)
             self.weight_raw.requires_grad = False
 
-        self.d_out = 256
+        self.d_out = d_out
         self.proj = nn.Linear(upstream_dim, self.d_out)
         self.lstm = nn.LSTM(input_size=self.d_out, hidden_size=self.d_out // 2, 
                                 num_layers=2, bidirectional=True, batch_first=True)
@@ -92,17 +140,18 @@ class MultiHeadAttentionCodebook(nn.Module):
     """
     Multihead Attention with learnable weights and keys, queries are from input.
     """
-    def __init__(self, codebook_size:int, q_dim: int, v_dim: int, num_heads: int, temperature: float=None):
+    def __init__(self, codebook_size:int, q_dim: int, k_dim: int, v_dim: int, num_heads: int, temperature: float=None):
         super().__init__()
         self.codebook_size = codebook_size
         self.q_dim = q_dim
+        self.k_dim = k_dim
         self.v_dim = v_dim
         self.num_heads = num_heads
-        self.temperature = (self.v_dim // self.num_heads) ** 0.5 if temperature is None else temperature
-        assert self.v_dim % self.num_heads == 0
+        self.temperature = (self.k_dim // self.num_heads) ** 0.5 if temperature is None else temperature
+        assert self.k_dim % self.num_heads == 0 and self.v_dim % self.num_heads == 0
 
-        self.q_linear = nn.Linear(self.q_dim, self.v_dim)
-        self.k_banks = nn.Parameter(torch.randn(self.codebook_size, self.v_dim))
+        self.q_linear = nn.Linear(self.q_dim, self.k_dim)
+        self.k_banks = nn.Parameter(torch.randn(self.codebook_size, self.k_dim))
         self.v_banks = nn.Parameter(torch.randn(self.codebook_size, self.v_dim))
         self.attention = MultiheadAttention(temperature=self.temperature)
 
@@ -110,15 +159,16 @@ class MultiHeadAttentionCodebook(nn.Module):
         """
         Args:
             query: Tensor with shape (B, L_q, q_dim).
+            attn_mask: Boolean tensor with shape (B, nH, L_q, L_q) or None.
         Return:
             attn_output: Tensor with shape (B, nH, L_q, q_dim).
             attn_weights: Tensor with shape (B, nH, L_q, v_dim // nH).
         """
         B = query.shape[0]
-        q = self.q_linear(query).view(B, -1, self.num_heads, self.v_dim // self.num_heads)
-        q = q.transpose(1, 2).contiguous()  # B, nH, L_q, v_dim // nH
-        k = self.k_banks.view(-1, self.num_heads, self.v_dim // self.num_heads)
-        k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1, nH, codebook_size, v_dim // nH
+        q = self.q_linear(query).view(B, -1, self.num_heads, self.k_dim // self.num_heads)
+        q = q.transpose(1, 2).contiguous()  # B, nH, L_q, k_dim // nH
+        k = self.k_banks.view(-1, self.num_heads, self.k_dim // self.num_heads)
+        k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1, nH, codebook_size, k_dim // nH
         v = self.v_banks.view(-1, self.num_heads, self.v_dim // self.num_heads)
         v = v.transpose(0, 1).unsqueeze(0).contiguous()  # 1, nH, codebook_size, v_dim // nH
         attn_output, attn_weights = self.attention(q, k, v, mask=attn_mask)
@@ -150,7 +200,7 @@ class SoftAttCodebook(pl.LightningModule):
             self.weight_raw = nn.Parameter(weights)
             self.weight_raw.requires_grad = False
 
-        self.attention = MultiHeadAttentionCodebook(self.codebook_size, q_dim=self.d_feat, v_dim=self.d_word_vec, num_heads=self.num_heads)
+        self.attention = MultiHeadAttentionCodebook(self.codebook_size, q_dim=self.d_feat, k_dim=self.d_word_vec, v_dim=self.d_word_vec, num_heads=self.num_heads)
 
     def forward(self, repr):
         """
@@ -210,3 +260,18 @@ class PRFramewiseLoss(nn.Module):
         preds = preds.transpose(1, 2)  # B, N, L
         target = labels[3]  # B, L
         return self.loss(preds, target)
+
+
+class OrthoLoss(nn.Module):
+    """ Orthogonal Loss """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor with shape (*other, size, dim).
+        """
+        gram = F.cosine_similarity(x.unsqueeze(-3), x.unsqueeze(-2), dim=-1)  # (*other, size, size)
+        return gram.mean()

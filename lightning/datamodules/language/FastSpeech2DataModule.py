@@ -37,9 +37,10 @@ class FastSpeech2DataModule(pl.LightningDataModule):
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
                 # self.dataset_cls(
+                FastSpeech2Dataset(
                 # NoisyFastSpeech2Dataset(
                 # SSLUnitPseudoLabelDataset(
-                SSLUnitFSCLDataset(
+                # SSLUnitFSCLDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config, spk_refer_wav=spk_refer_wav

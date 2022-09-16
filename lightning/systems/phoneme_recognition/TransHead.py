@@ -98,6 +98,8 @@ class TransHeadSystem(AdaptorSystem):
 
         _, qry_batch, repr_info, _ = batch[0]
         labels = list(qry_batch[0])
+
+        self.upstream.eval()
         ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
         ssl_repr = self._match_length(ssl_repr, labels[5])
         ssl_repr = ssl_repr.detach()

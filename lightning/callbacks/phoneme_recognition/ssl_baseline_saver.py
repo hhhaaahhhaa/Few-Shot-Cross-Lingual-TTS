@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import os
 import pandas as pd
 import pytorch_lightning as pl
@@ -16,8 +16,15 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from text.define import LANG_ID2SYMBOLS
 
 
+# Old version, will be removed future, these variables should be decided at runtime.
 CSV_COLUMNS = ["Total Loss"]
 COL_SPACE = [len(col) for col in ["200000", "Validation"]+CSV_COLUMNS]  # max step: 200000, longest stage: validation
+
+
+def set_format(keys: List[str]):
+    global CSV_COLUMNS, COL_SPACE
+    CSV_COLUMNS = keys
+    COL_SPACE = [len(col) for col in ["200000", "Validation"]+CSV_COLUMNS]
 
 
 class Saver(Callback):
@@ -57,7 +64,11 @@ class Saver(Callback):
 
         # Log message to log.txt and print to stdout
         if step % trainer.log_every_n_steps == 0 and pl_module.local_rank == 0:
-            loss_dict = loss2dict(loss)
+            if isinstance(loss, Dict):
+                loss_dict = {k: v.item() for k, v in loss.items()}
+                set_format(list(loss_dict.keys()))
+            else:  # Old version, will be removed in future
+                loss_dict = loss2dict(loss)
             loss_dict.update({"Step": step, "Stage": "Training"})
             df = pd.DataFrame([loss_dict], columns=["Step", "Stage"]+CSV_COLUMNS)
             if len(self.log_loss_dicts)==0:
@@ -65,11 +76,6 @@ class Saver(Callback):
             else:
                 tqdm.write(df.to_string(header=True, index=False, col_space=COL_SPACE).split('\n')[-1])
             self.log_loss_dicts.append(loss_dict)
-
-            # # calculate acc
-            # mask = (_batch[3] != 0)
-            # acc = ((_batch[3] == output.argmax(dim=2)) * mask).sum() / mask.sum()
-            # pl_module.log_dict({"Train/Acc": acc.item()})
 
             # log asr results
             sentence = _batch[3][0]
@@ -95,7 +101,10 @@ class Saver(Callback):
             else:
                 logger = pl_module.logger
 
-        loss_dict = loss2dict(loss)
+        if isinstance(loss, Dict):
+            loss_dict = {k: v.item() for k, v in loss.items()}
+        else:  # Old version, will be removed in future
+            loss_dict = loss2dict(loss)
         self.val_loss_dicts.append(loss_dict)
 
         # Log loss for each sample to csv files
