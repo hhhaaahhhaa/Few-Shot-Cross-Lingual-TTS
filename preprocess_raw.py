@@ -53,7 +53,7 @@ def preprocess_raw(parser_name, raw_root, preprocessed_root, n_workers=4):
     elif parser_name == "GlobalPhone":
         raw_parser = GlobalPhoneRawParser(raw_root)
     elif parser_name == "TATTTS":
-        raw_paerser = TATTTSRawParser(raw_root)
+        raw_parser = TATTTSRawParser(raw_root)
     else:
         raise NotImplementedError
 

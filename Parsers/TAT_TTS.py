@@ -9,7 +9,7 @@ class TATTTSRawParser(object):
         self.data = None
 
     def parse(self):
-        self.data = {"data": [], "data_info": [], "all_speajers": []}
+        self.data = {"data": [], "data_info": [], "all_speakers": []}
         for speaker in tqdm(os.listdir(self.root)):
             self.data["all_speakers"].append(speaker)
             for partition in os.listdir(f"{self.root}/{speaker}"):

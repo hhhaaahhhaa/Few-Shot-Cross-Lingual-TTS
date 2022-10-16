@@ -22,7 +22,9 @@ class SSLUnitParser(BaseDataParser):
             "dp_duration_avg_pitch", root, SFQueryParser(f"{self.root}/dp_duration_avg_pitch"), NumpyIO(), enable_cache=True)
         self.dp_duration_avg_energy = Feature(
             "dp_duration_avg_energy", root, SFQueryParser(f"{self.root}/dp_duration_avg_energy"), NumpyIO(), enable_cache=True)
-
+        self.alignment_matrix = Feature(
+            "alignment_matrix", root, NestSFQueryParser(f"{self.root}/alignment_matrix"), NumpyIO(), enable_cache=True)
+    
     def _init_structure(self):
         os.makedirs(f"{self.root}/dp_segment", exist_ok=True)
         os.makedirs(f"{self.root}/phoneme", exist_ok=True)
