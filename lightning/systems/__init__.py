@@ -18,6 +18,7 @@ SYSTEM = {
     "pr-ssl-cluster-tune": phoneme_recognition.SSLClusterTuneSystem,
     "pr-fscl": phoneme_recognition.TransHeadSystem,
     "pr-fscl-tune": phoneme_recognition.TransHeadTuneSystem,
+    "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
 }
 
 def get_system(algorithm):

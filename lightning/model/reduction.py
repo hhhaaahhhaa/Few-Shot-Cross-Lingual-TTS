@@ -43,10 +43,13 @@ class PhonemeQueryExtractor(pl.LightningModule):
     """
     Perform phoneme-level average first, then reduct across the same phoneme class within the batch again.
     Support different second stage reduction modes: "average", "random", "pool".
-    Output tensor shape is (1, n_symbols, *dims) for consistency reason.
+    Output tensor shape is (1, n_symbols, *dims) for consistency.
+
+    If 'two_stage' is false, skip phoneme-level average step, and second stage will operates on frame-level.
     """
-    def __init__(self, mode: str="average") -> None:
+    def __init__(self, mode: str="average", two_stage: bool=True) -> None:
         super().__init__()
+        self.two_stage = two_stage
         if mode == "average":
             self.reduction = AverageReductionModule()
         elif mode == "random":
@@ -56,20 +59,20 @@ class PhonemeQueryExtractor(pl.LightningModule):
         else:
             raise NotImplementedError
 
-    def forward(self, representations, avg_frames: List[List[int]], info):
-        n_symbols = info["n_symbols"]
-        phonemes = info["phonemes"]
+    def forward(self, representations, avg_frames: List[List[int]], n_symbols: int, phonemes):
         table = {i: [] for i in range(n_symbols)}
 
         _, *dims = representations[0].shape
         for phoneme, d_list, repr in zip(phonemes, avg_frames, representations):
+            assert not torch_exist_nan(repr)
             pos = 0
             for p, d in zip(phoneme, d_list):
                 if d > 0:
-                    if not torch_exist_nan(repr[pos: pos + d]):
+                    if self.two_stage:
                         table[int(p)].append(repr[pos: pos + d].mean(dim=0))
                     else:
-                        print("oh, so bad...")
+                        for r in repr[pos: pos + d]:
+                            table[int(p)].append(r)
                 pos += d
 
         phn_query = self.reduction(list(range(n_symbols)), table, dims)

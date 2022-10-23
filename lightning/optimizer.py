@@ -3,7 +3,7 @@ import numpy as np
 
 
 def get_optimizer(model, model_config, train_config):
-    init_lr = np.power(model_config["transformer"]["encoder_hidden"], -0.5)
+    init_lr = np.power(256, -0.5)  # TODO: do not depent on model config
 
     optimizer = torch.optim.Adam(
         model.parameters(),

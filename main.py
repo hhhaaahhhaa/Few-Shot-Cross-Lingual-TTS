@@ -35,11 +35,14 @@ TRAINER_CONFIG = {
     "gpus": -1 if torch.cuda.is_available() else None,
     "accelerator": "ddp" if torch.cuda.is_available() else None,
     "auto_select_gpus": True,
-    "limit_train_batches": 1.0,  # Useful for fast experiment
-    # "deterministic": True,
     "process_position": 1,
     "profiler": 'simple',
 }
+if Define.DEBUG:
+    TRAINER_CONFIG.update({
+        "limit_train_batches": 200,  # Useful for debugging
+        "limit_val_batches": 50,  # Useful for debugging
+    })
 
 
 def main(args, configs):
@@ -298,7 +301,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-ue", "--upstream_exp", type=str, help="upstream options",
-        default="hubert",
+        default="hubert_large_ll60k",
     )
     args = parser.parse_args()
     Define.EXP_IDX = args.index_exp

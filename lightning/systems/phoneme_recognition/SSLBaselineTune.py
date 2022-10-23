@@ -6,7 +6,7 @@ from dlhlp_lib.s3prl import S3PRLExtractor
 
 from lightning.systems.system import System
 from lightning.utils.log import pr_loss2dict as loss2dict
-from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
+from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
 from .modules import BiLSTMDownstream, MultilingualPRHead, MultilingualClusterHead, PRFramewiseLoss
@@ -27,9 +27,6 @@ class SSLBaselineTuneSystem(System):
         self.downstream = BiLSTMDownstream(n_in_layers=Define.UPSTREAM_LAYER, upstream_dim=Define.UPSTREAM_DIM, specific_layer=Define.LAYER_IDX)
         self.head = MultilingualPRHead(LANG_ID2SYMBOLS, 256)
         self.loss_func = PRFramewiseLoss()
-
-        if Define.DEBUG:
-            print(self)
 
     def build_optimized_model(self):
         return nn.ModuleList([self.head])

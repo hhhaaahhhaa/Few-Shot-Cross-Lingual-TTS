@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, GPUStatsMonitor, ModelCheckpoint
 
+import Define
 from lightning.callbacks import GlobalProgressBar
 from lightning.optimizer import get_optimizer
 from lightning.scheduler import get_scheduler
@@ -23,6 +24,9 @@ class System(pl.LightningModule):
         self.result_dir = result_dir
         
         self.build_model()
+        if Define.DEBUG:
+            print("Model structure:")
+            print(self)
 
     def build_model(self):
         """ Build all components here. """

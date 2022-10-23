@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 from lightning.systems.system import System
-from lightning.callbacks.phoneme_recognition.ssl_baseline_saver import Saver
+from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
 from .modules import BiLSTMDownstream, MultiHeadAttentionCodebook, MultilingualClusterHead, PRFramewiseLoss, OrthoLoss
@@ -42,7 +42,7 @@ class SSLCodebookClusterSystem(System):
         return self.loss_func2(k)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.downstream, self.head])
+        return nn.ModuleList([self.downstream, self.codebook, self.head])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
@@ -52,9 +52,10 @@ class SSLCodebookClusterSystem(System):
         labels, repr_info = batch
 
         self.upstream.eval()
-        ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
-        ssl_repr = ssl_match_length(ssl_repr, labels[5])
-        ssl_repr = ssl_repr.detach()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, labels[5])
+            ssl_repr = ssl_repr.detach()
 
         if Define.DEBUG:
             print(ssl_repr.shape)

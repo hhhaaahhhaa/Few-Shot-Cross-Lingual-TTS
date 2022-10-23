@@ -120,8 +120,8 @@ class SSLPRDataset(Dataset):
         for (s, e) in segment:
             avg_frames.append(
                 int(
-                    np.round(e * 50)  # All ssl model use 20ms window
-                    - np.round(s * 50)
+                    round(round(e * 1 / 0.02, 4))
+                    - round(round(s * 1 / 0.02, 4))
                 )
             )
         phonemes = self.data_parser.phoneme.read_from_query(query)

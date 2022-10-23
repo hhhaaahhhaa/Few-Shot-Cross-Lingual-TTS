@@ -50,30 +50,24 @@ class FSCLCollate(object):
         qry_out = list()
         for idxs in idx_arr:  # Currently batch size is fixed to 1 when using this class.
             sup_ids, qry_ids = self.split_sup_qry(data, idxs, shots, queries)
-            # print("S/Q ids", sup_ids, qry_ids)
-
-            # st1 = time.time()
             sup_out.append(reprocess(data, sup_ids))
-            # pad_sup = time.time() - st1
-
             qry_out.append(reprocess(data, qry_ids))
-            # pad_qry = time.time() - st1
 
             lang_id = data[idxs[0]]["lang_id"]
             n_symbols = data[idxs[0]]["n_symbols"]
 
             repr_info = {}
-            repr_info["wav"] = [torch.from_numpy(data[idx]["wav"]).float() for idx in qry_ids]
+            repr_info["qry_wav"] = [torch.from_numpy(data[idx]["wav"]).float() for idx in qry_ids]
             repr_info["n_symbols"] = n_symbols
             repr_info["lang_id"] = lang_id
 
-            repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
-            repr_info["phonemes"] = [data[idx]["text"] for idx in idxs]
-            repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idxs]
-            # calc_ref = time.time() - st1
+            repr_info["sup_wav"] = [torch.from_numpy(data[idx]["wav"]).float() for idx in sup_ids]
+            repr_info["sup_phonemes"] = [data[idx]["text"] for idx in sup_ids]
+            repr_info["sup_avg_frames"] = [data[idx]["avg-frames"] for idx in sup_ids]
+            repr_info["sup_lens"] = sup_out[-1][4]
+            repr_info["sup_repr_max_len"] = sup_out[-1][5]
 
-        return (sup_out, qry_out, repr_info, lang_id)
-
+        return (sup_out, qry_out, repr_info)
 
     def split_sup_qry(self, data, idxs, shots, queries):
         assert len(idxs) == shots + queries
@@ -111,6 +105,7 @@ class FSCLCollate(object):
 
 
 class GeneralFSCLCollate(object):
+    # Deprecated, not correct
     """
     Provide raw features and segments for speech representation extraction.
     This is a general version of FSCLCollate (without split).

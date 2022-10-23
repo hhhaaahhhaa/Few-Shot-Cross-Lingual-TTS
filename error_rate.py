@@ -39,7 +39,7 @@ def evaluate_pl_filter(
     unit_name: str, root: str,
     symbol_ref2unify: Dict, symbol_pred2unify: Dict,
     # thresholds = [0.1 * i for i in range(1, 10)]
-    thresholds = [0.8, 0.85, 0.9, 0.95]
+    thresholds = [0.01, 0.2, 0.9, 0.95]
 ):  # unit_name in front for consistency with _dpdp scripts
     fp = 0.02
     data_parser = DataParser(root)
@@ -48,7 +48,7 @@ def evaluate_pl_filter(
     print(f"[{unit_name}]:")
     ref_phn_feat = data_parser.get_feature("phoneme")
     ref_seg_feat = data_parser.get_feature("mfa_segment")
-    alignment_matrix_feat = data_parser.get_feature(f"ssl_units/{unit_name}/alignment_matrix")
+    alignment_matrix_feat = data_parser.get_feature(f"ssl_units/{unit_name}/lp_matrix")
     alignment_matrix_feat.read_all()
     ref_phn_feat.read_all()
     ref_seg_feat.read_all()
@@ -153,14 +153,15 @@ if __name__ == "__main__":
     # ssl_linear_dpdp experiments
     # evaluate_ssl_unit(f"pr-ssl-linear-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
     # evaluate_ssl_unit(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-linear-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-linear-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
+    evaluate_pl_filter(f"pr-ssl-cluster-lp", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
     
     # ssl_baseline_dpdp (enzh) experiments
     # evaluate_ssl_unit(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
     # evaluate_ssl_unit(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/JSUT", symbol_ref2unify, symbol_pred2unify)
     
     # ko
     from text.define import LANG_ID2SYMBOLS
@@ -181,14 +182,14 @@ if __name__ == "__main__":
     # ssl_linear_dpdp experiments
     # evaluate_ssl_unit(f"pr-ssl-linear-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
     # evaluate_ssl_unit(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-linear-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-linear-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-linear-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
 
     # ssl_baseline_dpdp (enzh) experiments
     # evaluate_ssl_unit(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
     # evaluate_ssl_unit(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
-    evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune4", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
+    # evaluate_pl_filter(f"pr-ssl-enzh-baseline-tune-oracle", "./preprocessed_data/kss", symbol_ref2unify, symbol_pred2unify)
 
     
     # unit_ref_segment experiments

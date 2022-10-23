@@ -18,6 +18,7 @@ DATA_MODULE = {
     "pr-ssl-cluster-tune": phoneme_recognition.SSLPRDataModule,
     "pr-fscl": phoneme_recognition.FSCLDataModule,
     "pr-fscl-tune": phoneme_recognition.SSLPRDataModule,
+    "pr-ssl-protonet": phoneme_recognition.FSCLDataModule,
 }
 
 def get_datamodule(algorithm):

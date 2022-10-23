@@ -41,10 +41,10 @@ class FSCLDataset(Dataset):
         segment = self.data_parser.mfa_segment.read_from_query(query)
         avg_frames = []
         for (s, e) in segment:
-            avg_frames.append(
+            avg_frames.append(  # Numeric issue exists, always round two times to get the correct result.
                 int(
-                    np.round(e * 50)  # All ssl model use 20ms window
-                    - np.round(s * 50)
+                    round(round(e * 1 / 0.02, 4))
+                    - round(round(s * 1 / 0.02, 4))
                 )
             )
         phonemes = self.data_parser.phoneme.read_from_query(query)
@@ -79,7 +79,7 @@ class FSCLDataset(Dataset):
         }
 
         sample.update({
-            "raw-feat": raw_feat,
+            # "raw-feat": raw_feat,
             "avg-frames": avg_frames,
         })
 
@@ -143,10 +143,10 @@ class SSLUnitFSCLDataset(Dataset):
         segment = self.unit_parser.dp_segment.read_from_query(query)
         avg_frames = []
         for (s, e) in segment:
-            avg_frames.append(
+            avg_frames.append(  # Numeric issue exists, always round two times to get the correct result.
                 int(
-                    np.round(e * 50)  # All ssl model use 20ms window
-                    - np.round(s * 50)
+                    round(round(e * 1 / 0.02, 4))
+                    - round(round(s * 1 / 0.02, 4))
                 )
             )
         phonemes = self.unit_parser.phoneme.read_from_query(query)

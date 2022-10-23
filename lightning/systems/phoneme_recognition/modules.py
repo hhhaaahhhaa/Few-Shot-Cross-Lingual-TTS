@@ -1,4 +1,3 @@
-from turtle import forward
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -114,11 +113,12 @@ class MultilingualPRHead(nn.Module):
 
     
 class MultilingualClusterHead(nn.Module):
-    def __init__(self, lang_id2symbols: Dict[str, int], d_in: int, temperature=0.1):
+    def __init__(self, lang_id2symbols: Dict[str, int], d_in: int, temperature=0.1, mode="cos"):
         super().__init__()
         self.lang_id2symbols = lang_id2symbols
         self.d_in = d_in
         self.temperature = temperature
+        self.mode = mode
 
         self.clusters = nn.ParameterDict()
         for lang_id, v in lang_id2symbols.items():
@@ -132,8 +132,15 @@ class MultilingualClusterHead(nn.Module):
         Return:
             Tensor with shape (B, L, n_c), calculate cosine similarity between centers and input as Hubert and wav2vec2.0.
         """
-        sim = F.cosine_similarity(self.clusters[f"head-{lang_id}"].unsqueeze(0).unsqueeze(0), x.unsqueeze(2), dim=3)  # B, L, n_c
-        return sim / self.temperature
+        y = self.clusters[f"head-{lang_id}"].unsqueeze(0).unsqueeze(0)
+        if self.mode == "cos":
+            sim = F.cosine_similarity(y, x.unsqueeze(2), dim=3)  # B, L, n_c
+            return sim / self.temperature
+        elif self.mode == "l2":
+            sim = torch.linalg.norm(y - x.unsqueeze(2), dim=3)
+            return sim
+        else:
+            raise NotImplementedError
 
 
 class MultiHeadAttentionCodebook(nn.Module):

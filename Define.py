@@ -39,7 +39,7 @@ def merge_stats(stats_dict, keys):
 # Experiment parameters
 USE_COMET = True
 EXP_IDX = 0
-UPSTREAM = "hubert"
+UPSTREAM = "hubert_large_ll60k"
 UPSTREAM_DIM = 1024
 LAYER_IDX = None
 UPSTREAM_LAYER = 0
@@ -52,7 +52,11 @@ def set_upstream(x):
     if x == "mel":
         UPSTREAM = x
         UPSTREAM_DIM = 80
-    elif x in ["hubert", "wav2vec2", "xlsr53"]:
+    elif x in ["hubert", "wav2vec2"]:
+        UPSTREAM = x
+        UPSTREAM_DIM = 768
+        UPSTREAM_LAYER = 13
+    elif x in ["hubert_large_ll60k", "wav2vec2_large_ll60k", "wav2vec2_xlsr"]:
         UPSTREAM = x
         UPSTREAM_DIM = 1024
         UPSTREAM_LAYER = 25
