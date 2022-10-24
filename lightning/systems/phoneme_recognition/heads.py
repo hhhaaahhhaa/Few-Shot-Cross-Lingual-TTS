@@ -44,7 +44,7 @@ class MultilingualClusterHead(nn.Module):
             sim = F.cosine_similarity(y, x.unsqueeze(2), dim=3)  # B, L, n_c
             return sim / self.temperature
         elif self.mode == "l2":
-            sim = torch.linalg.norm(y - x.unsqueeze(2), dim=3)
+            sim = -torch.linalg.norm(y - x.unsqueeze(2), dim=3)
             return sim
         else:
             raise NotImplementedError

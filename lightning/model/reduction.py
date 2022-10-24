@@ -143,7 +143,7 @@ class RandomSelectReductionModule(pl.LightningModule):
 
 class PoolReductionModule(pl.LightningModule):
     """
-    Given K class labels and some representations, pool one representation for each class.
+    Given K class labels and some representations, perform partial average representation for each class.
     A representation pool is maintained for each class.
     """
 
@@ -166,13 +166,14 @@ class PoolReductionModule(pl.LightningModule):
         """
         pooled_repr = []
         for c in class_labels:
-            if c not in self.pools:
-                self.pools[c] = DataPool(max_size=self.max_size, auto_resize=True)
-            self.pools[c].extend(table[c])
-            pooled = self.pools[c].choices(1)
-            if pooled is None:
+            if len(table[c]) == 0:
                 pooled_repr.append(torch.zeros(repr_shape).to(self.device))
             else:
+                self.pools[c] = DataPool(max_size=self.max_size, auto_resize=False)
+                self.pools[c].extend(table[c])
+                self.pools[c].resize()
+
+                pooled = torch.mean(torch.stack(self.pools[c]._data, axis=0), axis=0)
                 pooled_repr.append(pooled)
         pooled_repr = torch.stack(pooled_repr, dim=0).float()
 

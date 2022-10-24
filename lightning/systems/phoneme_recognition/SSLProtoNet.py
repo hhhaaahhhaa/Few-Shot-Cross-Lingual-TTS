@@ -90,7 +90,7 @@ class SSLProtoNetSystem(AdaptorSystem):
         x = self.downstream(ssl_repr, labels[4].cpu())
 
         # Prototype loss
-        output = torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
+        output = -torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
         loss = self.loss_func(labels, output)
 
         if self.support_head:
@@ -108,7 +108,7 @@ class SSLProtoNetSystem(AdaptorSystem):
                 "Total Loss": loss
             }
             
-        return loss_dict, output_support
+        return loss_dict, output
 
     def training_step(self, batch, batch_idx):
         sup_batch, qry_batch, repr_info = batch[0]
