@@ -19,8 +19,8 @@ from .SSLBaseline import training_step_template, validation_step_template
 class SSLProtoNetSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.support_head = True
+        super().__init__(*args, **kwargs)
 
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
