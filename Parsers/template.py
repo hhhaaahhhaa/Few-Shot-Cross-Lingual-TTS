@@ -1,7 +1,7 @@
-from codecs import ignore_errors
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import librosa
+import json
 
 from dlhlp_lib.audio.tools import wav_normalization
 from dlhlp_lib.audio import AUDIO_CONFIG
@@ -70,7 +70,7 @@ def preprocess(data_parser: DataParser, queries):
     duration_avg_pitch_and_energy_mp(
         data_parser, queries,
         duration_featname="mfa_duration",
-        pitch_featname="pitch",
+        pitch_featname="interpolate_pitch",
         energy_featname="energy",
         refresh=True,
         ignore_errors=ignore_errors
@@ -81,3 +81,18 @@ def preprocess(data_parser: DataParser, queries):
         ref_featname="spk_ref_mel_slices",
         ignore_errors=ignore_errors
     )
+    stats = get_stats(
+        data_parser,
+        pitch_featname="interpolate_pitch",
+        energy_featname="energy",
+        refresh=True
+    )
+    with open(data_parser.stats_path, 'w', encoding='utf-8') as f:
+        json.dump(stats, f)
+    
+    # Generate cache
+    data_parser.text.read_all(refresh=True)
+    data_parser.phoneme.read_all(refresh=True)
+    data_parser.mfa_segment.read_all(refresh=True)
+    data_parser.mfa_duration_avg_energy.read_all(refresh=True)
+    data_parser.mfa_duration_avg_pitch.read_all(refresh=True)

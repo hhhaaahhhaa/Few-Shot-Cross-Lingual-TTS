@@ -13,52 +13,42 @@ from .parser import DataParser
 from . import template
 
 
-class LibriTTSRawParser(BaseRawParser):
+class LJSpeechRawParser(BaseRawParser):
     def __init__(self, root: Path, preprocessed_root: Path):
         super().__init__(root)
         self.data_parser = DataParser(str(preprocessed_root))
-        self.dsets = [
-            "train-clean-100",
-            "train-clean-360",
-            "train-other-500",
-            "dev-clean",
-            "dev-other",
-            "test-clean",
-            "test-other",
-        ]
 
     def prepare_initial_features(self, query, data):
         template.prepare_initial_features(self.data_parser, query, data)
 
     def parse(self, n_workers=4):
-        res = {"data": [], "data_info": [], "all_speakers": []}
-        for dset in self.dsets:
-            if not os.path.isdir(f"{self.root}/{dset}"):
-                continue
-            for speaker in tqdm(os.listdir(f"{self.root}/{dset}"), desc=dset):
-                res["all_speakers"].append(speaker)
-                for chapter in os.listdir(f"{self.root}/{dset}/{speaker}"):
-                    for filename in os.listdir(f"{self.root}/{dset}/{speaker}/{chapter}"):
-                        if filename[-4:] != ".wav":
-                            continue
-                        basename = filename[:-4]
-                        wav_path = f"{self.root}/{dset}/{speaker}/{chapter}/{basename}.wav"
-                        text_path = f"{self.root}/{dset}/{speaker}/{chapter}/{basename}.normalized.txt"
-                        with open(text_path, "r", encoding="utf-8") as f:
-                            text = f.readline().strip("\n")
-                        data = {
-                            "wav_path": wav_path,
-                            "text": text,
-                        }
-                        data_info = {
-                            "spk": speaker,
-                            "basename": basename,
-                            "dset": dset,
-                            "chapter": chapter,
-                        }
-                        res["data"].append(data)
-                        res["data_info"].append(data_info)
-
+        res = {"data": [], "data_info": [], "all_speakers": ["LJSpeech"]}
+        path = f"{self.root}/metadata.csv"
+        speaker = "LJSpeech"
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in tqdm(f):
+                if line == "\n":
+                    continue
+                wav_name, _, text = line.strip().split("|")
+                if text[-1].isalpha():  # add missing periods
+                    text += '.'
+                wav_path = f"{self.root}/wavs/{wav_name}.wav"
+                if os.path.isfile(wav_path):
+                    basename = wav_name
+                    data = {
+                        "wav_path": wav_path,
+                        "text": text,
+                    }
+                    data_info = {
+                        "spk": speaker,
+                        "basename": basename,
+                    }
+                    res["data"].append(data)
+                    res["data_info"].append(data_info)
+                else:
+                    print("metadata.csv should not contain non-exist wav files, data might be corrupted.")
+                    print(f"Can not find {wav_path}.")
+        
         with open(self.data_parser.metadata_path, "w", encoding="utf-8") as f:
             json.dump(res["data_info"], f, indent=4)
         with open(self.data_parser.speakers_path, "w", encoding="utf-8") as f:
@@ -72,7 +62,7 @@ class LibriTTSRawParser(BaseRawParser):
                 pass
 
 
-class LibriTTSPreprocessor(BasePreprocessor):
+class LJSpeechPreprocessor(BasePreprocessor):
     def __init__(self, preprocessed_root: Path):
         super().__init__(preprocessed_root)
         self.data_parser = DataParser(str(preprocessed_root))

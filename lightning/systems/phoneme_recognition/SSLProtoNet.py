@@ -19,7 +19,7 @@ from .SSLBaseline import training_step_template, validation_step_template
 class SSLProtoNetSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
-        self.support_head = True
+        self.support_head = False
         super().__init__(*args, **kwargs)
 
     def build_model(self):
@@ -33,8 +33,8 @@ class SSLProtoNetSystem(AdaptorSystem):
         )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=False)
         if self.support_head:
-            self.head = MultilingualClusterHead(
-                LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"], mode="l2")
+            self.head = MultilingualPRHead(
+                LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
         
         self.loss_func = PRFramewiseLoss()
 
