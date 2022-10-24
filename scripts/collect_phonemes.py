@@ -31,6 +31,11 @@ def generate_phoneme_set(phns: Set[str], output_path: str) -> None:
 
 if __name__ == "__main__":
     phns = collect_phonemes([
+        "preprocessed_data/JSUT_new"
+    ])
+    generate_phoneme_set(phns, "MFA/Japanese/phoneset.txt")
+
+    phns = collect_phonemes([
         "preprocessed_data/kss_new"
     ])
     generate_phoneme_set(phns, "MFA/Korean/phoneset.txt")

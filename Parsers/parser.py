@@ -8,7 +8,7 @@ from dlhlp_lib.parsers.QueryParsers import SFQueryParser, NestSFQueryParser
 from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO, JSONIO
 
 
-class SSLUnitParser(BaseDataParser):
+class SSLUnitParserOld(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
@@ -34,9 +34,9 @@ class SSLUnitParser(BaseDataParser):
         return getattr(self, query)
 
 
-class DataParser(BaseDataParser):
+class DataParserOld(BaseDataParser):
 
-    ssl_units: Dict[str, SSLUnitParser]
+    ssl_units: Dict[str, SSLUnitParserOld]
 
     def __init__(self, root):
         super().__init__(root)
@@ -119,7 +119,7 @@ class DataParser(BaseDataParser):
 """
 New DataParser (v2)
 """
-class SSLUnitParserNew(BaseDataParser):
+class SSLUnitParser(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
@@ -145,7 +145,7 @@ class SSLUnitParserNew(BaseDataParser):
         return getattr(self, query)
 
 
-class DataParserNew(BaseDataParser):
+class DataParser(BaseDataParser):
 
     ssl_units: Dict[str, SSLUnitParser]
 
@@ -166,9 +166,9 @@ class DataParserNew(BaseDataParser):
         self.energy = Feature(
             NestSFQueryParser(f"{self.root}/energy"), NumpyIO(), enable_cache=True)
         self.mfa_duration_avg_pitch = Feature(
-            root, NestSFQueryParser(f"{self.root}/mfa_duration_avg_pitch"), NumpyIO(), enable_cache=True)
+            NestSFQueryParser(f"{self.root}/mfa_duration_avg_pitch"), NumpyIO(), enable_cache=True)
         self.mfa_duration_avg_energy = Feature(
-            root, NestSFQueryParser(f"{self.root}/mfa_duration_avg_energy"), NumpyIO(), enable_cache=True)
+            NestSFQueryParser(f"{self.root}/mfa_duration_avg_energy"), NumpyIO(), enable_cache=True)
         
         self.wav_trim_22050 = Feature(
             NestSFQueryParser(f"{self.root}/wav_trim_22050"), NumpyIO())
@@ -181,7 +181,7 @@ class DataParserNew(BaseDataParser):
         self.phoneme = Feature(
             NestSFQueryParser(f"{self.root}/phoneme"), TextIO(), enable_cache=True)
         self.text = Feature(
-            NestSFQueryParser(f"{self.root}/text"), TextIO(), enable_cache=True)
+            SFQueryParser(f"{self.root}/text"), TextIO(), enable_cache=True)
         self.spk_ref_mel_slices = Feature(
             NestSFQueryParser(f"{self.root}/spk_ref_mel_slices"), NumpyIO())
         self.mfa_duration = Feature(

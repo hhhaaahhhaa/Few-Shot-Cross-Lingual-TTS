@@ -21,3 +21,4 @@ tqdm
 unidecode
 torchaudio
 seaborn
+nnmnkwii
