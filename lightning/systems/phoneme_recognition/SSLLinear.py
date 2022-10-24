@@ -4,13 +4,15 @@ import torch.nn.functional as F
 
 from dlhlp_lib.s3prl import S3PRLExtractor
 
-from lightning.systems.system import System
-from lightning.utils.log import pr_loss2dict as loss2dict
-from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-from .modules import MultilingualPRHead, MultilingualClusterHead, WeightedSumLayer, PRFramewiseLoss
+from lightning.systems.system import System
+from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.utils.tool import ssl_match_length
+from .modules import PRFramewiseLoss
+from .downstreams import *
+from .heads import *
+from .SSLBaseline import training_step_template, validation_step_template
 
 
 class SSLLinearTuneSystem(System):
@@ -25,11 +27,9 @@ class SSLLinearTuneSystem(System):
         self.upstream = S3PRLExtractor("hubert_large_ll60k")
         self.upstream.freeze()
         self.downstream = WeightedSumLayer(n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, Define.UPSTREAM_DIM)
+        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=Define.UPSTREAM_DIM)
+        
         self.loss_func = PRFramewiseLoss()
-
-        if Define.DEBUG:
-            print(self)
 
     def build_optimized_model(self):
         return nn.ModuleList([self.downstream, self.head])
@@ -40,8 +40,6 @@ class SSLLinearTuneSystem(System):
 
     # Tune Interface
     def tune_init(self, *args, **kwargs):
-        # Freeze part of the model
-        # self.model.freeze()
         self.lang_id = self.preprocess_config["lang_id"]
         print("Current language: ", self.lang_id)
         
@@ -49,43 +47,28 @@ class SSLLinearTuneSystem(System):
         labels, repr_info = batch
 
         self.upstream.eval()
-        ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
-        ssl_repr = ssl_match_length(ssl_repr, labels[5])
-        ssl_repr = ssl_repr.detach()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, labels[5])
+            ssl_repr = ssl_repr.detach()
 
-        if Define.DEBUG:
-            print(ssl_repr.shape)
-            print(labels[3].shape)
+        # print(ssl_repr.shape)
+        # print(labels[3].shape)
 
         x = self.downstream(ssl_repr, dim=2)
        
         output = self.head(x, lang_id=repr_info["lang_id"])
         loss = self.loss_func(labels, output)
-
-        return loss, output
+        loss_dict = {
+            "Total Loss": loss,
+        }
+            
+        return loss_dict, output
 
     def training_step(self, batch, batch_idx):
         labels, repr_info = batch
-        train_loss, predictions = self.common_step(batch, batch_idx, train=True)
-
-        mask = (labels[3] != 0)
-        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
-
-        # Log metrics to CometLogger
-        loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
-        self.log_dict(loss_dict, sync_dist=True)
-        return {'loss': train_loss, 'losses': train_loss, 'output': predictions, '_batch': labels, 'lang_id': repr_info["lang_id"]}
-
+        return training_step_template(self, batch, batch_idx, labels, repr_info)
+    
     def validation_step(self, batch, batch_idx):
         labels, repr_info = batch
-        val_loss, predictions = self.common_step(batch, batch_idx)
-
-        mask = (labels[3] != 0)
-        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
-
-        # Log metrics to CometLogger
-        loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
-        self.log_dict(loss_dict, sync_dist=True)
-        return {'losses': val_loss, 'output': predictions, '_batch': labels, 'lang_id': repr_info["lang_id"]}
+        return validation_step_template(self, batch, batch_idx, labels, repr_info)

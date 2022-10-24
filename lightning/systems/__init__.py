@@ -13,7 +13,7 @@ SYSTEM = {
     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearTuneSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
     "pr-ssl-cluster": phoneme_recognition.SSLClusterSystem,
-    "pr-ssl-codebook-cluster": phoneme_recognition.SSLCodebookClusterSystem,
+    # "pr-ssl-codebook-cluster": phoneme_recognition.SSLCodebookClusterSystem,
     "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem,
     "pr-ssl-cluster-tune": phoneme_recognition.SSLClusterTuneSystem,
     "pr-fscl": phoneme_recognition.TransHeadSystem,

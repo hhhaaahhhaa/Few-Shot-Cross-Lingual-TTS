@@ -5,12 +5,14 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
+from text.define import LANG_ID2SYMBOLS
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.model.reduction import PhonemeQueryExtractor
 from lightning.utils.tool import ssl_match_length
 from .modules import PRFramewiseLoss
 from .downstreams import *
+from .heads import *
 from .SSLBaseline import training_step_template, validation_step_template
 
 
@@ -18,6 +20,7 @@ class SSLProtoNetSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.support_head = True
 
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
@@ -29,6 +32,9 @@ class SSLProtoNetSystem(AdaptorSystem):
             specific_layer=Define.LAYER_IDX
         )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=False)
+        if self.support_head:
+            self.head = MultilingualClusterHead(
+                LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"], mode="l2")
         
         self.loss_func = PRFramewiseLoss()
 
@@ -40,6 +46,8 @@ class SSLProtoNetSystem(AdaptorSystem):
         assert len(batch[0][1][0]) == 7, "data with 7 elements"
     
     def build_optimized_model(self):
+        if self.support_head:
+            return nn.ModuleList([self.downstream, self.head])
         return nn.ModuleList([self.downstream])
 
     def build_saver(self):
@@ -60,9 +68,8 @@ class SSLProtoNetSystem(AdaptorSystem):
                             repr_info["n_symbols"], repr_info["sup_phonemes"])  # 1, n_symbols, n_layers, dim
         prototypes = prototypes.squeeze(0)  # n_symbols, dim
         
-        if Define.DEBUG:
-            print("Prototype shape and gradient required: ", prototypes.shape)
-            print(prototypes.requires_grad)
+        # print("Prototype shape and gradient required: ", prototypes.shape)
+        # print(prototypes.requires_grad)
         
         return prototypes
 
@@ -86,11 +93,22 @@ class SSLProtoNetSystem(AdaptorSystem):
         output = torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
         loss = self.loss_func(labels, output)
 
-        loss_dict = {
-            "Total Loss": loss,
-        }
+        if self.support_head:
+            output_support = self.head(x, lang_id=repr_info["lang_id"])
+            loss_support = self.loss_func(labels, output_support)
+
+        if self.support_head:
+            loss_dict = {
+                "Total Loss": loss + loss_support,
+                "Proto Loss": loss,
+                "L2 cluster Loss": loss_support
+            }
+        else:
+            loss_dict = {
+                "Total Loss": loss
+            }
             
-        return loss_dict, output
+        return loss_dict, output_support
 
     def training_step(self, batch, batch_idx):
         sup_batch, qry_batch, repr_info = batch[0]

@@ -13,7 +13,7 @@ DATA_MODULE = {
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-cluster": phoneme_recognition.SSLPRDataModule,
-    "pr-ssl-codebook-cluster": phoneme_recognition.SSLPRDataModule,
+    # "pr-ssl-codebook-cluster": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-cluster-tune": phoneme_recognition.SSLPRDataModule,
     "pr-fscl": phoneme_recognition.FSCLDataModule,

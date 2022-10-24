@@ -4,16 +4,14 @@ import torch.nn.functional as F
 
 from dlhlp_lib.s3prl import S3PRLExtractor
 
-from lightning.systems.system import System
-from lightning.utils.log import pr_loss2dict as loss2dict
-from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
+from lightning.systems.system import System
+from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
+from lightning.utils.tool import ssl_match_length
 from .modules import PRFramewiseLoss
 from .downstreams import *
 from .heads import *
-
-from lightning.utils.tool import ssl_match_length
 
 
 class SSLBaselineSystem(System):
@@ -30,7 +28,8 @@ class SSLBaselineSystem(System):
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX
         )
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"])
+        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
+        
         self.loss_func = PRFramewiseLoss()
 
     def build_optimized_model(self):
@@ -74,7 +73,6 @@ class SSLBaselineSystem(System):
 class SSLClusterSystem(SSLBaselineSystem):
     """
     This class only replace the MultilingualPRHead with MultilingualClusterHead.
-    I wish to prove that cluster head results in better representation and more compatible with DPDP.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

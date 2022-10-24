@@ -1,3 +1,4 @@
+# Deprecated, do not use GlobalPhone when doing tts
 import os
 import glob
 from tqdm import tqdm

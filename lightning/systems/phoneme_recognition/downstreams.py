@@ -23,7 +23,7 @@ class WeightedSumLayer(nn.Module):
     def forward(self, x, dim: int):
         weight_shape = [1] * x.dim()
         weight_shape[dim] = self.n_in_layers
-        weighted_sum = torch.reshape(F.softmax(self.weight_raw), tuple(weight_shape)) * x  # B, L, d_in
+        weighted_sum = torch.reshape(F.softmax(self.weight_raw, dim=0), tuple(weight_shape)) * x  # B, L, d_in
         weighted_sum = weighted_sum.sum(dim=dim)
         
         return weighted_sum

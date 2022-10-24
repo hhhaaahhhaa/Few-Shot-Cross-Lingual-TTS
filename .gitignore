@@ -134,6 +134,7 @@ lightning_logs/
 /_*/
 /results/
 output/
+MFA/
 preprocessed_data/*/
 *.npy
 *.csv
