@@ -2,12 +2,15 @@ import torch
 import numpy as np
 import json
 
+from text.define import LANG_ID2SYMBOLS
+
 
 LOCAL = True
-DEBUG = False
+DEBUG = True
 CUDA_LAUNCH_BLOCKING = False
 MAX_WORKERS = 4
 DATAPARSERS = {}
+CTC_DECODERS = {}
 ALLSTATS = {}
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -62,6 +65,22 @@ def set_upstream(x):
         UPSTREAM_LAYER = 25
     else:
         raise NotImplementedError
+
+
+from torchaudio.models.decoder import ctc_decoder
+def get_ctc_decoder(lang_id):
+    global CTC_DECODERS
+    if lang_id not in CTC_DECODERS:
+        print(f"Constrct ctc decoder for lang_id: {lang_id}")
+        CTC_DECODERS[lang_id] = ctc_decoder(
+            lexicon=None,
+            tokens=LANG_ID2SYMBOLS[lang_id],
+            lm=None,
+            nbest=1,
+            beam_size=50,
+            beam_size_token=30
+        )
+    return CTC_DECODERS[lang_id]
 
 
 if __name__ == "__main__":

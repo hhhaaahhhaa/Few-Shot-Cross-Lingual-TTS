@@ -20,6 +20,7 @@ class SSLProtoNetSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         self.support_head = False
+        self.use_ctc = True
         super().__init__(*args, **kwargs)
 
     def build_model(self):
@@ -36,14 +37,18 @@ class SSLProtoNetSystem(AdaptorSystem):
             self.head = MultilingualPRHead(
                 LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
         
-        self.loss_func = PRFramewiseLoss()
+        if self.use_ctc:
+            # self.loss_func = nn.CTCLoss(blank=0, zero_infinity=True)
+            self.loss_func = PRFramewiseLoss()
+        else:
+            self.loss_func = PRFramewiseLoss()
 
     def _on_meta_batch_start(self, batch):
         """ Check meta-batch data """
         assert len(batch) == 1, "meta_batch_per_gpu"
         assert len(batch[0]) == 2 or len(batch[0]) == 3, "sup + qry (+ ref_phn_feats)"
         assert len(batch[0][1]) == 1, "n_batch == 1"
-        assert len(batch[0][1][0]) == 7, "data with 7 elements"
+        assert len(batch[0][1][0]) == 10, "data with 10 elements"
     
     def build_optimized_model(self):
         if self.support_head:
@@ -74,8 +79,7 @@ class SSLProtoNetSystem(AdaptorSystem):
         return prototypes
 
     def common_step(self, batch, batch_idx, train=True):
-        if Define.DEBUG:
-            print("Generate prototypes... ")
+        # print("Generate prototypes... ")
         prototypes = self.build_prototype(batch)
 
         sup_batch, qry_batch, repr_info = batch[0]
@@ -91,7 +95,13 @@ class SSLProtoNetSystem(AdaptorSystem):
 
         # Prototype loss
         output = -torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
-        loss = self.loss_func(labels, output)
+        if self.use_ctc:
+            loss = self.loss_func(labels, output)
+        #     log_probs = torch.log_softmax(output, dim=2)
+        #     with torch.backends.cudnn.flags(deterministic=True):  # for reproducibility
+        #         loss = self.loss_func(log_probs.transpose(0, 1), labels[6], labels[4].cpu(), labels[7].cpu())
+        else:
+            loss = self.loss_func(labels, output)
 
         if self.support_head:
             output_support = self.head(x, lang_id=repr_info["lang_id"])
@@ -101,7 +111,7 @@ class SSLProtoNetSystem(AdaptorSystem):
             loss_dict = {
                 "Total Loss": loss + loss_support,
                 "Proto Loss": loss,
-                "L2 cluster Loss": loss_support
+                "Linear Loss": loss_support
             }
         else:
             loss_dict = {

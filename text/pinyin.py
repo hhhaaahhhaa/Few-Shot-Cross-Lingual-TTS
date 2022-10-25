@@ -342,7 +342,7 @@ mfa_finals = [
     "ve3",
     "ve4",
     "ve5",
-    "n",
+    # "n",
     "ng",
 ]
 valid_symbols = initials + mfa_finals + ["rr"]

@@ -88,7 +88,7 @@ class LibriTTSPreprocessor(BasePreprocessor):
     def denoise(self):
         pass
 
-    def create_dataset(self):
+    def preprocess(self):
         queries = self.data_parser.get_all_queries()
         if Define.DEBUG:
             queries = queries[:128]

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import jiwer
 
 from dlhlp_lib.s3prl import S3PRLExtractor
 
@@ -101,9 +102,30 @@ def training_step_template(pl_module, batch, batch_idx, labels, repr_info):
 def validation_step_template(pl_module, batch, batch_idx, labels, repr_info):
     val_loss_dict, predictions = pl_module.common_step(batch, batch_idx)
 
-    mask = (labels[3] != 0)
-    acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-    pl_module.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
+    # Use default beam search decoder for ctc
+    if (getattr(pl_module, "use_ctc", None) is not None) and getattr(pl_module, "use_ctc", None):
+        ctc_decoder = Define.get_ctc_decoder(repr_info["lang_id"])
+        emissions = torch.log_softmax(predictions.detach().cpu(), dim=2)
+        beam_search_results = ctc_decoder(emissions, labels[4].cpu())
+        acc = 0
+        for i, res in enumerate(beam_search_results):
+            # Dirty since we need to manipulate redundant silence token from ctc_decoder!
+            pred_transcript = ctc_decoder.idxs_to_tokens(res[0].tokens)
+            pred_transcript = " ".join([p for p in pred_transcript if p != "|"])
+            gt_transcript = ctc_decoder.idxs_to_tokens(labels[6][i][:labels[7][i]].cpu())
+            gt_transcript = " ".join([p for p in gt_transcript if p != "|"])
+            acc += 1 - jiwer.wer(gt_transcript, pred_transcript)
+            print(pred_transcript)
+            print(gt_transcript)
+            print(1 - jiwer.wer(gt_transcript, pred_transcript))
+        acc /= len(beam_search_results)
+        pl_module.log_dict({"Val/Acc": acc}, sync_dist=True)
+        print(acc)
+    
+        mask = (labels[3] != 0)
+        acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
+        print(acc.item())
+        # pl_module.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
 
     # Log metrics to CometLogger
     loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}

@@ -17,6 +17,7 @@ SPEAKERS = {
     "french": "css10-fr",
     "german": "css10-de",
     "spanish": "css10-es",
+    "dutch": "css10-nl",
     "russian": "css10-ru",
 }
 
@@ -24,6 +25,7 @@ SPEAKERS = {
 class CSS10RawParser(BaseRawParser):
     def __init__(self, root: Path, preprocessed_root: Path):
         super().__init__(root)
+        self.lang = str(self.root).split('/')[-1]
         self.data_parser = DataParser(str(preprocessed_root))
 
     def prepare_initial_features(self, query, data):
@@ -32,7 +34,7 @@ class CSS10RawParser(BaseRawParser):
     def parse(self, n_workers=4):
         res = {"data": [], "data_info": [], "all_speakers": []}
         path = self.root / "transcript.txt"
-        speaker = SPEAKERS[str(self.root).split('/')[-1]]
+        speaker = SPEAKERS[self.lang]
         res["all_speakers"].append(speaker)
         with open(path, 'r', encoding='utf-8') as f:
             for line in tqdm(f):
@@ -72,6 +74,7 @@ class CSS10RawParser(BaseRawParser):
 class CSS10Preprocessor(BasePreprocessor):
     def __init__(self, preprocessed_root: Path):
         super().__init__(preprocessed_root)
+        self.lang = str(self.root).split('/')[-1]
         self.data_parser = DataParser(str(preprocessed_root))
 
     def prepare_mfa(self, mfa_data_dir: Path):
@@ -99,8 +102,8 @@ class CSS10Preprocessor(BasePreprocessor):
 
     def mfa(self, mfa_data_dir: Path):
         corpus_directory = str(mfa_data_dir)
-        dictionary_path = "lexicon/css10-de-lexicon.txt"
-        acoustic_model_path = "MFA/German/css10-de_acoustic_model.zip"
+        dictionary_path = f"lexicon/{SPEAKERS[self.lang]}-lexicon.txt"
+        acoustic_model_path = f"MFA/{self.lang.capitalize()}/{SPEAKERS[self.lang]}_acoustic_model.zip"
         output_directory = str(self.root / "TextGrid")
         cmd = f"mfa align {corpus_directory} {dictionary_path} {acoustic_model_path} {output_directory} -j 8 -v --clean"
         os.system(cmd)
