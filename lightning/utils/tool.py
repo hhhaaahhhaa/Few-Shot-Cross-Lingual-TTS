@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -196,12 +197,28 @@ def read_queries_from_txt(path):
     res = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f.readlines():
+            if line == '\n':
+                continue
             n, s, t, r = line.strip("\n").split("|")
             res.append({
                 "basename": n,
                 "spk": s,
             })
     return res
+
+
+def write_queries_to_txt(data_parser: DataParser, queries, path):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    lines = []
+    for query in queries:
+        line = [query["basename"], query["spk"]]
+        line.append(f"{{{data_parser.phoneme.read_from_query(query)}}}")
+        line.append(data_parser.text.read_from_query(query))
+        lines.append(line)
+    with open(path, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write("|".join(line))
+            f.write('\n')
 
 
 def generate_reference(path, data_parser: DataParser, lang_id):

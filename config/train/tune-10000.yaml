@@ -1,4 +1,6 @@
+scheduler_type: const
 optimizer:
+  lr: 0.0001
   batch_size: 4
   betas: [0.9, 0.98]
   eps: 0.000000001
@@ -6,8 +8,6 @@ optimizer:
   grad_clip_thresh: 1.0
   grad_acc_step: 1
   warm_up_step: 4000
-  anneal_steps: [300000, 400000, 500000]
-  anneal_rate: 0.3
 step:
   total_step: 10000
   log_step: 250

@@ -45,6 +45,16 @@ if __name__ == "__main__":
     ])
     generate_phoneme_set(phns, "MFA/German/phoneset.txt")
 
+    phns = collect_phonemes([
+        "preprocessed_data/CSS10/french"
+    ])
+    generate_phoneme_set(phns, "MFA/French/phoneset.txt")
+
+    phns = collect_phonemes([
+        "preprocessed_data/CSS10/spanish"
+    ])
+    generate_phoneme_set(phns, "MFA/Spanish/phoneset.txt")
+
     # phns = collect_phonemes([
     #     "preprocessed/TAT-TTS", 
     #     "preprocessed/TAT"

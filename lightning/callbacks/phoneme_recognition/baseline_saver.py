@@ -11,7 +11,6 @@ from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.loggers.base import merge_dicts
 from pytorch_lightning.utilities import rank_zero_only
 
-from Define import USE_COMET
 from lightning.utils.log import pr_loss2dict as loss2dict
 from text.define import LANG_ID2SYMBOLS
 
@@ -38,6 +37,7 @@ class Saver(Callback):
         os.makedirs(self.log_dir, exist_ok=True)
         os.makedirs(self.result_dir, exist_ok=True)
         print("Log directory:", self.log_dir)
+        print("Result directory:", self.result_dir)
 
         self.val_loss_dicts = []
         self.log_loss_dicts = []
@@ -49,18 +49,17 @@ class Saver(Callback):
             self.re_id_increment[k] = increment
             increment += len(v)
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         loss = outputs['losses']
         output = outputs['output']
         _batch = outputs['_batch']  # batch or qry_batch
         lang_id = outputs['lang_id']
         step = pl_module.global_step + 1
-        if USE_COMET:
-            if isinstance(pl_module.logger, list):
-                assert len(list(pl_module.logger)) == 1
-                logger = pl_module.logger[0]
-            else:
-                logger = pl_module.logger
+        if isinstance(pl_module.logger, list):
+            assert len(list(pl_module.logger)) == 1
+            logger = pl_module.logger[0]
+        else:
+            logger = pl_module.logger
 
         # Log message to log.txt and print to stdout
         if step % trainer.log_every_n_steps == 0 and pl_module.local_rank == 0:
@@ -94,12 +93,11 @@ class Saver(Callback):
         lang_id = outputs['lang_id']
         
         step = pl_module.global_step + 1
-        if USE_COMET:
-            if isinstance(pl_module.logger, list):
-                assert len(list(pl_module.logger)) == 1
-                logger = pl_module.logger[0]
-            else:
-                logger = pl_module.logger
+        if isinstance(pl_module.logger, list):
+            assert len(list(pl_module.logger)) == 1
+            logger = pl_module.logger[0]
+        else:
+            logger = pl_module.logger
 
         if isinstance(loss, Dict):
             loss_dict = {k: v.item() for k, v in loss.items()}
@@ -120,6 +118,26 @@ class Saver(Callback):
             self.log_text(logger, "Val/GT: " + ", ".join(gt_sentence), step)
             self.log_text(logger, "Val/Pred: " + ", ".join(pred_sentence), step)
 
+    def on_validation_epoch_end(self, trainer, pl_module):
+        loss_dict = merge_dicts(self.val_loss_dicts)
+        step = pl_module.global_step+1
+
+        # Log total loss to log.txt and print to stdout
+        loss_dict.update({"Step": step, "Stage": "Validation"})
+        # To stdout
+        df = pd.DataFrame([loss_dict], columns=["Step", "Stage"]+CSV_COLUMNS)
+        if len(self.log_loss_dicts)==0:
+            tqdm.write(df.to_string(header=True, index=False, col_space=COL_SPACE))
+        else:
+            tqdm.write(df.to_string(header=True, index=False, col_space=COL_SPACE).split('\n')[-1])
+        # To file
+        self.log_loss_dicts.append(loss_dict)
+        log_file_path = os.path.join(self.log_dir, 'log.txt')
+        df = pd.DataFrame(self.log_loss_dicts, columns=["Step", "Stage"]+CSV_COLUMNS).set_index("Step")
+        df.to_csv(log_file_path, mode='a', header=not os.path.exists(log_file_path), index=True)
+        # Reset
+        self.log_loss_dicts = []
+    
     def log_csv(self, stage, step, basename, loss_dict):
         if stage in ("Training", "Validation"):
             log_dir = os.path.join(self.log_dir, "csv", stage)

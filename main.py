@@ -53,17 +53,17 @@ def main(args, configs):
     #====== Parsing original format to general format ======
     # TODO: Tune and training currently are using different config format.
     data_configs = []
-    for prep in preprocess_configs:
-        parse_prep = {
-            "name": prep["dataset"],
-            "lang_id": prep["lang_id"],
-            "unit_name": prep.get("unit_name", ""),
-            "data_dir": prep["path"]["preprocessed_path"], 
-            "subsets": prep["subsets"],
-            "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
-        }
-        data_configs.append(parse_prep)
-    # data_configs = preprocess_configs
+    # for prep in preprocess_configs:
+    #     parse_prep = {
+    #         "name": prep["dataset"],
+    #         "lang_id": prep["lang_id"],
+    #         "unit_name": prep.get("unit_name", ""),
+    #         "data_dir": prep["path"]["preprocessed_path"], 
+    #         "subsets": prep["subsets"],
+    #         "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
+    #     }
+    #     data_configs.append(parse_prep)
+    data_configs = preprocess_configs
 
     # register parsers, merge normalization stats
     import json
@@ -81,8 +81,8 @@ def main(args, configs):
         print("Initialize data parsers and build normalize stats, done.")
     #==========================================================
 
-    for p in train_config["path"].values():
-        os.makedirs(p, exist_ok=True)
+    # for p in train_config["path"].values():
+    #     os.makedirs(p, exist_ok=True)
 
     # Checkpoint for resume training or testing
     ckpt_file = None
@@ -101,7 +101,7 @@ def main(args, configs):
     trainer_training_config = {
         'max_steps': train_config["step"]["total_step"],
         'log_every_n_steps': train_config["step"]["log_step"],
-        'weights_save_path': train_config["path"]["ckpt_path"],
+        # 'weights_save_path': train_config["path"]["ckpt_path"],
         'gradient_clip_val': train_config["optimizer"]["grad_clip_thresh"],
         'accumulate_grad_batches': train_config["optimizer"]["grad_acc_step"],
         'resume_from_checkpoint': ckpt_file,
@@ -130,12 +130,18 @@ def main(args, configs):
             result_dir = os.path.join(
                 train_config['path']['result_path'], comet_logger.version
             )
+            ckpt_dir = os.path.join(
+                train_config['path']['ckpt_path'], comet_logger.version
+            )
         else:
-            os.makedirs(args.output_path, exist_ok=True)
-            result_dir = args.output_path
-            log_dir = args.output_path.replace("results", "logs")
+            log_dir = f"{args.output_path}/log"
+            result_dir = f"{args.output_path}/result"
+            ckpt_dir = f"{args.output_path}/ckpt"
             os.makedirs(log_dir, exist_ok=True)
-
+            os.makedirs(result_dir, exist_ok=True)
+            os.makedirs(ckpt_dir, exist_ok=True)
+            tb_logger = pl.loggers.TensorBoardLogger(save_dir=log_dir)
+            loggers = [tb_logger]
     else:
         assert args.exp_key is not None
         log_dir = os.path.join(
@@ -173,13 +179,13 @@ def main(args, configs):
         if pretrain_ckpt_file is None:
             model = system(
                 preprocess_configs[0], model_config, train_config, algorithm_config,
-                log_dir, result_dir
+                log_dir, result_dir, ckpt_dir
             )
         else:
             model = system.load_from_checkpoint(
                 pretrain_ckpt_file, 
                 preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
-                log_dir=log_dir, result_dir=result_dir
+                log_dir=log_dir, result_dir=result_dir, ckpt_dir=ckpt_dir
             )
 
         if Define.DEBUG:
@@ -189,62 +195,60 @@ def main(args, configs):
         # Train
         if Define.DEBUG:
             print("Start Training!")
-        if Define.USE_COMET:
-            trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
-            pl.seed_everything(43, True)
-        else:
-            trainer = pl.Trainer(**TRAINER_CONFIG, **trainer_training_config)
+        pl.seed_everything(43, True)
+        trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
         trainer.fit(model, datamodule=datamodule)
 
-    elif args.stage == 'test' or args.stage == 'predict':
-        # Get model
-        system = get_system(algorithm_config["type"])
-        model = system.load_from_checkpoint(
-            ckpt_file, 
-            preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
-            log_dir=log_dir, result_dir=result_dir
-        )
-        # Test
-        trainer = pl.Trainer(**TRAINER_CONFIG)
-        trainer.test(model, datamodule=datamodule)
+    # TODO: Somewhat dirty, to be refactored
+    # elif args.stage == 'test' or args.stage == 'predict':
+    #     # Get model
+    #     system = get_system(algorithm_config["type"])
+    #     model = system.load_from_checkpoint(
+    #         ckpt_file, 
+    #         preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
+    #         log_dir=log_dir, result_dir=result_dir
+    #     )
+    #     # Test
+    #     trainer = pl.Trainer(**TRAINER_CONFIG)
+    #     trainer.test(model, datamodule=datamodule)
 
-    elif args.stage == 'debug':
-        del datamodule
-        datamodule = get_datamodule("base")(
-            preprocess_configs, train_config, algorithm_config, log_dir, result_dir
-        )
-        datamodule.setup('test')
-        for _ in tqdm(datamodule.test_dataset, desc="test_dataset"):
-            pass
+    # elif args.stage == 'debug':
+    #     del datamodule
+    #     datamodule = get_datamodule("base")(
+    #         preprocess_configs, train_config, algorithm_config, log_dir, result_dir
+    #     )
+    #     datamodule.setup('test')
+    #     for _ in tqdm(datamodule.test_dataset, desc="test_dataset"):
+    #         pass
 
-    elif args.stage == 'tune':
-        # Get model
-        system = get_system(algorithm_config["type"])
-        if pretrain_ckpt_file is not None:
-            model = system.load_from_checkpoint(
-                pretrain_ckpt_file,
-                preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
-                log_dir=log_dir, result_dir=result_dir
-            )
-        else:
-            model = system(
-                preprocess_configs[0], model_config, train_config, algorithm_config,
-                log_dir, result_dir
-            )
-        if "semi" in algorithm_config["type"]:
-            # model.tune_init(data_configs["sup"][0])
-            model.tune_init(config_reader.read("_data/JSUT/4-shot/task-0"))
-        else:
-            model.tune_init(data_configs[0])
+    # elif args.stage == 'tune':
+    #     # Get model
+    #     system = get_system(algorithm_config["type"])
+    #     if pretrain_ckpt_file is not None:
+    #         model = system.load_from_checkpoint(
+    #             pretrain_ckpt_file,
+    #             preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
+    #             log_dir=log_dir, result_dir=result_dir
+    #         )
+    #     else:
+    #         model = system(
+    #             preprocess_configs[0], model_config, train_config, algorithm_config,
+    #             log_dir, result_dir
+    #         )
+    #     if "semi" in algorithm_config["type"]:
+    #         # model.tune_init(data_configs["sup"][0])
+    #         model.tune_init(config_reader.read("_data/JSUT/4-shot/task-0"))
+    #     else:
+    #         model.tune_init(data_configs[0])
 
-        # Train
-        if Define.USE_COMET:
-            trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
-            pl.seed_everything(43, True)
-        else:
-            trainer = pl.Trainer(**TRAINER_CONFIG, **trainer_training_config)
-        trainer.fit(model, datamodule=datamodule)
-        trainer.test(model, datamodule=datamodule)
+    #     # Train
+    #     if Define.USE_COMET:
+    #         trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
+    #         pl.seed_everything(43, True)
+    #     else:
+    #         trainer = pl.Trainer(**TRAINER_CONFIG, **trainer_training_config)
+    #     trainer.fit(model, datamodule=datamodule)
+    #     trainer.test(model, datamodule=datamodule)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -291,10 +295,10 @@ if __name__ == "__main__":
         "-s", "--stage", type=str, help="stage (train/val/test/predict)",
         default="train",
     )
-    parser.add_argument(
-        "-ie", "--index_exp", type=int, help="0-19",
-        default=0,
-    )
+    # parser.add_argument(
+    #     "-ie", "--index_exp", type=int, help="0-19",
+    #     default=0,
+    # )
     parser.add_argument(
         "-le", "--layer_exp", help="1-24", type=int,
         default=None,
@@ -303,28 +307,31 @@ if __name__ == "__main__":
         "-ue", "--upstream_exp", type=str, help="upstream options",
         default="hubert_large_ll60k",
     )
+    parser.add_argument("--use_comet", action="store_true", default=False)
+
     args = parser.parse_args()
-    Define.EXP_IDX = args.index_exp
+    Define.USE_COMET = args.use_comet
     Define.LAYER_IDX = args.layer_exp
     Define.set_upstream(args.upstream_exp)
-    print(f"Task {args.index_exp}, Layer {args.layer_exp}, Upstream {args.upstream_exp}...")
+    print(f"Layer {args.layer_exp}, Upstream {args.upstream_exp}...")
 
     # Read Config. TODO: Tune and training currently are using different config format.
-    preprocess_configs = [
-        yaml.load(open(path, "r"), Loader=yaml.FullLoader)
-        for path in args.preprocess_config
-    ]
-    # config_reader = LanguageDataConfigReader()
-    # preprocess_configs = [config_reader.read(path) for path in args.preprocess_config]
+    # preprocess_configs = [
+    #     yaml.load(open(path, "r"), Loader=yaml.FullLoader)
+    #     for path in args.preprocess_config
+    # ]
+    config_reader = LanguageDataConfigReader()
+    preprocess_configs = [config_reader.read(path) for path in args.preprocess_config]
     model_config = yaml.load(
         open(args.model_config, "r"), Loader=yaml.FullLoader
     )
     train_config = yaml.load(
         open(args.train_config[0], "r"), Loader=yaml.FullLoader
     )
-    train_config.update(
-        yaml.load(open(args.train_config[1], "r"), Loader=yaml.FullLoader)
-    )
+    if len(args.train_config) > 1:
+        train_config.update(
+            yaml.load(open(args.train_config[1], "r"), Loader=yaml.FullLoader)
+        )
     algorithm_config = yaml.load(
         open(args.algorithm_config, "r"), Loader=yaml.FullLoader
     )

@@ -6,7 +6,7 @@ from text.define import LANG_ID2SYMBOLS
 
 
 LOCAL = True
-DEBUG = True
+DEBUG = False
 CUDA_LAUNCH_BLOCKING = False
 MAX_WORKERS = 4
 DATAPARSERS = {}
@@ -41,11 +41,10 @@ def merge_stats(stats_dict, keys):
 
 # Experiment parameters
 USE_COMET = True
-EXP_IDX = 0
 UPSTREAM = "hubert_large_ll60k"
 UPSTREAM_DIM = 1024
 LAYER_IDX = None
-UPSTREAM_LAYER = 0
+UPSTREAM_LAYER = 25
 
 def set_upstream(x):
     global UPSTREAM

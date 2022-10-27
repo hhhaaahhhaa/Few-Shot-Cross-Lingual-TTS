@@ -115,17 +115,12 @@ def validation_step_template(pl_module, batch, batch_idx, labels, repr_info):
             gt_transcript = ctc_decoder.idxs_to_tokens(labels[6][i][:labels[7][i]].cpu())
             gt_transcript = " ".join([p for p in gt_transcript if p != "|"])
             acc += 1 - jiwer.wer(gt_transcript, pred_transcript)
-            print(pred_transcript)
-            print(gt_transcript)
-            print(1 - jiwer.wer(gt_transcript, pred_transcript))
         acc /= len(beam_search_results)
         pl_module.log_dict({"Val/Acc": acc}, sync_dist=True)
-        print(acc)
-    
+    else:
         mask = (labels[3] != 0)
         acc = ((labels[3] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
-        print(acc.item())
-        # pl_module.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
+        pl_module.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
 
     # Log metrics to CometLogger
     loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}

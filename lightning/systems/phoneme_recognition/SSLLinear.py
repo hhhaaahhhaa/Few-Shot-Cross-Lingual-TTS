@@ -21,12 +21,14 @@ class SSLLinearTuneSystem(System):
     """
 
     def __init__(self, *args, **kwargs):
+        self.upstream_freeze = True
         super().__init__(*args, **kwargs)
 
     def build_model(self):
         self.upstream = S3PRLExtractor("hubert_large_ll60k")
         self.upstream.freeze()
-        self.downstream = WeightedSumLayer(n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
+        self.downstream = WeightedSumLayer(
+            n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
         self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=Define.UPSTREAM_DIM)
         
         self.loss_func = PRFramewiseLoss()

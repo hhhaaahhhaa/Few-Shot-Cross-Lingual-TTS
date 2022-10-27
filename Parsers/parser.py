@@ -8,7 +8,7 @@ from dlhlp_lib.parsers.QueryParsers import SFQueryParser, NestSFQueryParser
 from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, TextIO, JSONIO
 
 
-class SSLUnitParserOld(BaseDataParser):
+class SSLUnitParser(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
@@ -34,9 +34,9 @@ class SSLUnitParserOld(BaseDataParser):
         return getattr(self, query)
 
 
-class DataParserOld(BaseDataParser):
+class DataParser(BaseDataParser):
 
-    ssl_units: Dict[str, SSLUnitParserOld]
+    ssl_units: Dict[str, SSLUnitParser]
 
     def __init__(self, root):
         super().__init__(root)
@@ -119,7 +119,7 @@ class DataParserOld(BaseDataParser):
 """
 New DataParser (v2)
 """
-class SSLUnitParser(BaseDataParser):
+class SSLUnitParser1(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
@@ -145,7 +145,7 @@ class SSLUnitParser(BaseDataParser):
         return getattr(self, query)
 
 
-class DataParser(BaseDataParser):
+class DataParser1(BaseDataParser):
 
     ssl_units: Dict[str, SSLUnitParser]
 
