@@ -37,6 +37,8 @@ class VarianceAdaptor(nn.Module):
         n_bins = model_config["variance_embedding"]["n_bins"]
         assert pitch_quantization in ["linear", "log"]
         assert energy_quantization in ["linear", "log"]
+
+        # Since pitch and energy are normalized, min/max need to be normalized, too
         pitch_min, pitch_max, pitch_mean, pitch_std, energy_min, energy_max, energy_mean, energy_std = Define.ALLSTATS["global"]
         pitch_min = (pitch_min - pitch_mean) / pitch_std
         pitch_max = (pitch_max - pitch_mean) / pitch_std

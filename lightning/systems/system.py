@@ -14,7 +14,7 @@ class System(pl.LightningModule):
 
     def __init__(
         self, preprocess_config, model_config, train_config, algorithm_config,
-        log_dir, result_dir, ckpt_dir
+        log_dir, result_dir, ckpt_dir=None
     ):
         super().__init__()
         self.preprocess_config = preprocess_config

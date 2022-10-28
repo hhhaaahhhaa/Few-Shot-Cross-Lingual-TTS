@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -129,3 +130,15 @@ class SSLProtoNetSystem(AdaptorSystem):
         sup_batch, qry_batch, repr_info = batch[0]
         labels = qry_batch[0]
         return validation_step_template(self, batch, batch_idx, labels, repr_info)
+
+    def on_save_checkpoint(self, checkpoint):
+        """ (Hacking!) Remove pretrained weights in checkpoint to save disk space. """
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for k in state_dict:
+            if k.split('.')[0] == "upstream":
+                continue
+            new_state_dict[k] = state_dict[k]
+        checkpoint["state_dict"] = new_state_dict
+
+        return checkpoint

@@ -4,26 +4,7 @@ import json
 import jiwer
 from tqdm import tqdm
 
-
-def segment2duration(segment, fp):
-    res = []
-    for (s, e) in segment:
-        res.append(
-            int(
-                round(round(e * 1 / fp, 4))
-                - round(round(s * 1 / fp, 4))
-            )
-        )
-    return res
-
-
-def expand(seq, dur):
-    assert len(seq) == len(dur)
-    res = []
-    for (x, d) in zip(seq, dur):
-        if d > 0:
-            res.extend([x] * d)
-    return res
+from dlhlp_lib.utils.tool import segment2duration, expand
 
 
 def fer(dir):
@@ -72,9 +53,23 @@ def per(dir):
 
 
 if __name__ == "__main__":
-    for s in [4, 8, 16]:
-        per(f"evaluation/output/linear/ko/{s}-shot")
-        fer(f"evaluation/output/linear/ko/{s}-shot")
+    # for s in [4, 8, 16]:
+    #     per(f"evaluation/output/linear/ko/{s}-shot")
+    #     fer(f"evaluation/output/linear/ko/{s}-shot")
     # for s in [4, 8, 16]:
     #     per(f"evaluation/output/linear/jp/{s}-shot")
     #     fer(f"evaluation/output/linear/jp/{s}-shot")
+    
+    # for s in [4, 8, 16]:
+    #     per(f"evaluation/output/baseline/ko/{s}-shot")
+    #     fer(f"evaluation/output/baseline/ko/{s}-shot")
+    # for s in [4, 8, 16]:
+    #     per(f"evaluation/output/baseline/jp/{s}-shot")
+    #     fer(f"evaluation/output/baseline/jp/{s}-shot")
+
+    for s in [4, 8, 16]:
+        per(f"evaluation/output/protonet-zs/ko/{s}-shot")
+        fer(f"evaluation/output/protonet-zs/ko/{s}-shot")
+    for s in [4, 8, 16]:
+        per(f"evaluation/output/protonet-zs/jp/{s}-shot")
+        fer(f"evaluation/output/protonet-zs/jp/{s}-shot")

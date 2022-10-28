@@ -3,24 +3,26 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import pytorch_lightning as pl
-import scipy
 from tqdm import tqdm
+import json
 import pickle
 import gc
 
 from dlhlp_lib.algorithm.dpdp import DPDPDecoder
-from dlhlp_lib.parsers.preprocess import *
 from dlhlp_lib.utils.numeric import torch_exist_nan
+from dlhlp_lib.utils.tool import segment2duration
 
 import Define
 from text.define import LANG_ID2SYMBOLS
 from lightning.systems import get_system
 from lightning.utils.tool import read_queries_from_txt
+from lightning.model.reduction import PhonemeQueryExtractor
 from Parsers.parser import DataParser
 from Objects.config import LanguageDataConfigReader
 
 
 config_reader = LanguageDataConfigReader()
+phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=False)
 
 
 class SSLPRModel(pl.LightningModule):
@@ -47,7 +49,6 @@ class SSLPRModel(pl.LightningModule):
         """
         repr, _ = self.pr_model.upstream.extract_from_paths([wav_path]) 
         x = self.pr_model.downstream(repr, lengths=torch.LongTensor([repr.shape[1]]))
-        x = self.pr_model.head(x, lang_id=lang_id)
         logits = x[0]  # L, dim
         return logits
 
@@ -105,14 +106,37 @@ def inference(
     # read query from task
     task = config_reader.read(task_path)
     sup_txt, qry_txt = task["subsets"]["train"], task["subsets"]["test"]
+    
+    # calculate prototype from sup_txt
+    queries = read_queries_from_txt(sup_txt)
+    representations, avg_frames, phonemes = [], [], []
+    for query in queries:
+        logits = all_logits[query["basename"]]
+        representations.append(torch.from_numpy(logits))
+
+        phoneme = data_parser.phoneme.read_from_query(query)
+        phoneme = [LANG_ID2SYMBOLS[lang_id].index(f'@{p}') for p in phoneme.strip().split()]
+        phonemes.append(phoneme)
+
+        segment = data_parser.mfa_segment.read_from_query(query)
+        durs = segment2duration(segment, fp=0.02)
+        avg_frames.append(durs)
+    
+    prototypes = phoneme_query_extractor(
+        representations,
+        avg_frames,
+        len(LANG_ID2SYMBOLS[lang_id]),
+        phonemes
+    ).squeeze(0)
 
     # execution
     res = []
     queries = read_queries_from_txt(qry_txt)
     for query in tqdm(queries, leave=False):
         logits = all_logits[query["basename"]]
-        score = -scipy.special.log_softmax(logits, axis=1)
-        segment, phoneme = decoder.decode(score, fp=20)
+        logits = -torch.linalg.norm(prototypes.unsqueeze(0) - torch.from_numpy(logits).unsqueeze(1), dim=2)  # L, n_c
+        score = -torch.log_softmax(logits, axis=1)
+        segment, phoneme = decoder.decode(score.numpy(), fp=20)
         phoneme = [mapping[str(phn)] for phn in phoneme]
         phoneme = ' '.join(phoneme)
         res.append({
@@ -128,16 +152,17 @@ def inference(
 
 def main_jp():
     Define.set_upstream(Define.UPSTREAM)
-    system_type = "pr-ssl-baseline"
-    exp_name = "baseline"
-    output_exp_name = "baseline"  # maybe use difference decoding such as dpdp or lp
+    system_type = "pr-ssl-protonet"
+    exp_name = "protonet"
+    output_exp_name = "protonet"  # maybe use difference decoding such as dpdp or lp
     data_parser = DataParser("preprocessed_data/JSUT")
 
     # Save logits (Only need to run once!)
     for s in [4, 8, 16]:
         os.makedirs(f"evaluation/logits/{exp_name}/jp/{s}-shot", exist_ok=True)
         for i in tqdm(range(20), desc=f"Save logits ({s} shot)"):
-            ckpt_path = f"output/{exp_name}/jp/jp-{s}-{i}/ckpt/epoch=2-step=1500.ckpt"
+            # ckpt_path = f"output/{exp_name}/jp/jp-{s}-{i}/ckpt/epoch=2-step=1500.ckpt"
+            ckpt_path = "output/ckpt/pr-fscl/0f0361bbfce54a0abc1e1848b15e07d7/checkpoints/epoch=19-step=50000.ckpt"
             task_path = f"_data/JSUT/few-shot/{s}-shot/task-{i}"
             output_path = f"evaluation/logits/{exp_name}/jp/{s}-shot/task-{i}.pkl"
             pr_model = SSLPRModel(system_type, ckpt_path)
@@ -157,16 +182,17 @@ def main_jp():
 
 def main_ko():
     Define.set_upstream(Define.UPSTREAM)
-    system_type = "pr-ssl-baseline"
-    exp_name = "baseline"
-    output_exp_name = "baseline"  # maybe use difference decoding such as dpdp or lp
+    system_type = "pr-ssl-protonet"
+    exp_name = "protonet"
+    output_exp_name = "protonet"  # maybe use difference decoding such as dpdp or lp
     data_parser = DataParser("preprocessed_data/kss")
 
     # Save logits (Only need to run once!)
     for s in [4, 8, 16]:
         os.makedirs(f"evaluation/logits/{exp_name}/ko/{s}-shot", exist_ok=True)
         for i in tqdm(range(20), desc=f"Save logits ({s} shot)"):
-            ckpt_path = f"output/{exp_name}/ko/ko-{s}-{i}/ckpt/epoch=2-step=1500.ckpt"
+            # ckpt_path = f"output/{exp_name}/ko/ko-{s}-{i}/ckpt/epoch=2-step=1500.ckpt"
+            ckpt_path = "output/ckpt/pr-fscl/0f0361bbfce54a0abc1e1848b15e07d7/checkpoints/epoch=19-step=50000.ckpt"
             task_path = f"_data/kss/few-shot/{s}-shot/task-{i}"
             output_path = f"evaluation/logits/{exp_name}/ko/{s}-shot/task-{i}.pkl"
             pr_model = SSLPRModel(system_type, ckpt_path)
