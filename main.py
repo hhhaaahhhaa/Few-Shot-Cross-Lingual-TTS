@@ -53,7 +53,7 @@ def main(args, configs):
     #====== Parsing original format to general format ======
     # TODO: Tune and training currently are using different config format.
     data_configs = []
-    if Define.USE_OLD_CONFIG
+    if Define.USE_OLD_CONFIG:
         for prep in preprocess_configs:
             parse_prep = {
                 "name": prep["dataset"],
@@ -318,7 +318,7 @@ if __name__ == "__main__":
     print(f"Layer {args.layer_exp}, Upstream {args.upstream_exp}...")
 
     # Read Config. TODO: Tune and training currently are using different config format.
-    if Define.USE_OLD_CONFIG
+    if Define.USE_OLD_CONFIG:
         preprocess_configs = [
             yaml.load(open(path, "r"), Loader=yaml.FullLoader)
             for path in args.preprocess_config

@@ -6,7 +6,7 @@ def get_scheduler(optimizer, train_config):
     scheduler_type = train_config.get("scheduler_type", "sqrt")
     if scheduler_type == "sqrt":
         lr_lambda = sqrt_schedule
-    if scheduler_type == "const":
+    elif scheduler_type == "const":
         lr_lambda = const_schedule
     else:
         raise NotImplementedError
