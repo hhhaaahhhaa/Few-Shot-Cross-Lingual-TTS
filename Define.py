@@ -6,6 +6,7 @@ from text.define import LANG_ID2SYMBOLS
 
 
 LOCAL = True
+USE_OLD_CONFIG = False
 DEBUG = False
 CUDA_LAUNCH_BLOCKING = False
 MAX_WORKERS = 4
