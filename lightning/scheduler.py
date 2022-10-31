@@ -29,7 +29,7 @@ def sqrt_schedule(train_config):
             if current_step <= n_warmup_steps:
                 factor = current_step / n_warmup_steps
             else:
-                factor = np.power(current_step, -0.5)
+                factor = np.power(n_warmup_steps / current_step, 0.5)
         else:
             factor = 1
         for s in anneal_steps:

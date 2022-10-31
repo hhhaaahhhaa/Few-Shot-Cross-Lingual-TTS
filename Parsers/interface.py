@@ -27,8 +27,14 @@ class BasePreprocessor(metaclass=abc.ABCMeta):
     def mfa(self, mfa_data_dir: Path) -> None:
         raise NotImplementedError
 
+    @abc.abstractmethod
     def denoise(self, *args, **kwargs) -> None:
-        pass
-
+        raise NotImplementedError
+    
+    @abc.abstractmethod
     def preprocess(self, *args, **kwargs) -> None:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def split_dataset(self, *args, **kwargs) -> None:
         raise NotImplementedError

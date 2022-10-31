@@ -134,6 +134,7 @@ lightning_logs/
 /_*/
 /results/
 output/
+other/
 evaluation/output/
 evaluation/logits/
 MFA/

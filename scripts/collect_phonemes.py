@@ -31,12 +31,12 @@ def generate_phoneme_set(phns: Set[str], output_path: str) -> None:
 
 if __name__ == "__main__":
     phns = collect_phonemes([
-        "preprocessed_data/JSUT_new"
+        "preprocessed_data/JSUT"
     ])
     generate_phoneme_set(phns, "MFA/Japanese/phoneset.txt")
 
     phns = collect_phonemes([
-        "preprocessed_data/kss_new"
+        "preprocessed_data/kss"
     ])
     generate_phoneme_set(phns, "MFA/Korean/phoneset.txt")
 
@@ -54,9 +54,3 @@ if __name__ == "__main__":
         "preprocessed_data/CSS10/spanish"
     ])
     generate_phoneme_set(phns, "MFA/Spanish/phoneset.txt")
-
-    # phns = collect_phonemes([
-    #     "preprocessed/TAT-TTS", 
-    #     "preprocessed/TAT"
-    # ])
-    # generate_phoneme_set(phns, "MFA/Taiwanese/phoneset.txt")

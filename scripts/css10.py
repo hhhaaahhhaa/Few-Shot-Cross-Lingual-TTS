@@ -67,6 +67,7 @@ def spanish_scripts():
 
 
 def dutch_scripts():
+    # TODO
     raw_dir = Path("/mnt/d/Data/CSS10/dutch")
     preprocessed_dir = Path("preprocessed_data/CSS10/dutch")
     mfa_data_dir = Path("preprocessed_data/CSS10/dutch/mfa_data")

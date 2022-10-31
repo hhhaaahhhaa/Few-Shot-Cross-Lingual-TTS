@@ -1,4 +1,6 @@
 import warnings
+
+from lightning.utils.tool import write_queries_to_txt
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import librosa
 import json
@@ -96,3 +98,27 @@ def preprocess(data_parser: DataParser, queries):
     data_parser.mfa_segment.read_all(refresh=True)
     data_parser.mfa_duration_avg_energy.read_all(refresh=True)
     data_parser.mfa_duration_avg_pitch.read_all(refresh=True)
+
+
+def split_monospeaker_dataset(data_parser: DataParser, queries, output_dir, val_size=1000):
+    trainset = queries[:-val_size]
+    valset = queries[-val_size:]
+    write_queries_to_txt(data_parser, trainset, f"{output_dir}/train.txt")
+    write_queries_to_txt(data_parser, valset, f"{output_dir}/val.txt")
+
+
+def split_multispeaker_dataset(data_parser: DataParser, queries, output_dir, val_spk_size=40):
+    spks = data_parser.get_all_speakers()
+    assert len(spks) > val_spk_size
+    train_spk, val_spk = spks[:-val_spk_size], spks[-val_spk_size:]
+
+    train_set, val_set = [], []
+    for q in queries:
+        if q["spk"] in train_spk:
+            train_set.append(q)
+        elif q["spk"] in val_spk:
+            val_set.append(q)
+        else:
+            raise ValueError("Unknown speaker detected, some error exists when preprocessing data.")
+    write_queries_to_txt(data_parser, train_set, f"{output_dir}/train.txt")
+    write_queries_to_txt(data_parser, val_set, f"{output_dir}/val.txt")

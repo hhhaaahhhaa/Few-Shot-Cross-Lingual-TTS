@@ -7,14 +7,14 @@ from Parsers import get_raw_parser, get_preprocessor
 
 
 if __name__ == "__main__":
-    # ----- German -----
+    # ----- kss -----
     raw_dir = Path("/mnt/d/Data/kss")
-    preprocessed_dir = Path("preprocessed_data/kss_new")
-    mfa_data_dir = Path("preprocessed_data/kss_new/mfa_data")
-    # raw_parser = get_raw_parser("KSS")(raw_dir, preprocessed_dir)
-    # prepocessor = get_preprocessor("KSS")(preprocessed_dir)
-    # raw_parser.parse(n_workers=8)
-    # prepocessor.prepare_mfa(mfa_data_dir)
+    preprocessed_dir = Path("preprocessed_data/kss")
+    mfa_data_dir = Path("preprocessed_data/kss/mfa_data")
+    raw_parser = get_raw_parser("KSS")(raw_dir, preprocessed_dir)
+    prepocessor = get_preprocessor("KSS")(preprocessed_dir)
+    raw_parser.parse(n_workers=8)
+    prepocessor.prepare_mfa(mfa_data_dir)
 
     # generate dictionary
     dictionary_path = "lexicon/kss-lexicon.txt"

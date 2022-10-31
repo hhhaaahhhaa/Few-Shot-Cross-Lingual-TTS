@@ -1,41 +1,103 @@
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
+import argparse
 import os
-from multiprocessing import set_start_method
+import torchaudio
+from pathlib import Path
 
-from dlhlp_lib.parsers.preprocess import *
-from dlhlp_lib.audio import AUDIO_CONFIG
-from Parsers.parser import DataParser
-
-
-INV_FRAME_PERIOD = AUDIO_CONFIG["audio"]["sampling_rate"] / AUDIO_CONFIG["stft"]["hop_length"]
+import Define
+from Parsers import get_raw_parser, get_preprocessor
 
 
-def preprocess(root):
-    print(f"Preprocess data from {root}...")
+if Define.CUDA_LAUNCH_BLOCKING:
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
-    data_parser = DataParser(root)
-    queries = data_parser.get_all_queries()
-    
-    textgrid2segment_and_phoneme_mp(data_parser, queries, n_workers=os.cpu_count() // 2)
-    trim_wav_by_mfa_segment_mp(data_parser, queries, sr=22050, n_workers=2, refresh=True)
-    trim_wav_by_mfa_segment_mp(data_parser, queries, sr=16000, n_workers=2, refresh=False)
-    wav_trim_22050_to_mel_energy_pitch_mp(data_parser, queries, n_workers=4)
-    extract_spk_ref_mel_slices_from_wav_mp(data_parser, queries, sr=16000, n_workers=4)
-    segment2duration_mp(data_parser, queries, "mfa_segment", "mfa_duration", INV_FRAME_PERIOD, n_workers=os.cpu_count() // 2, refresh=True)
-    duration_avg_pitch_and_energy_mp(data_parser, queries, "mfa_duration", n_workers=os.cpu_count() // 2, refresh=True)
-    
-    get_stats(data_parser, refresh=True)
+
+class Preprocessor:
+    def __init__(self, args):
+        self.args = args
+        self.dataset = args.dataset
+        self.root = args.raw_dir
+        self.preprocessed_root = args.preprocessed_dir
+        self.raw_parser = get_raw_parser(args.dataset)(Path(args.raw_dir), Path(args.preprocessed_dir))
+        self.processor = get_preprocessor(args.dataset)(Path(args.preprocessed_dir))
+
+    def exec(self, force=False):
+        self.print_message()
+        key_input = ""
+        if not force:
+            while key_input not in ["y", "Y", "n", "N"]:
+                key_input = input("Proceed? ([y/n])? ")
+        else:
+            key_input = "y"
+
+        if key_input in ["y", "Y"]:
+            # 0. Initial features from raw data
+            if self.args.parse_raw:
+                print("[INFO] Parsing raw corpus...")
+                self.raw_parser.parse(n_workers=8)
+            # 1. Denoising
+            if self.args.denoise:
+                print("[INFO] Denoising corpus...")
+                torchaudio.set_audio_backend("sox_io")
+                self.processor.denoise()
+            # 2. Prepare MFA
+            if self.args.prepare_mfa:
+                print("[INFO] Preparing data for Montreal Force Alignment...")
+                self.processor.prepare_mfa(Path(self.preprocessed_root) / "mfa_data")
+            # 3. MFA
+            if self.args.mfa:
+                print("[INFO] Performing Montreal Force Alignment...")
+                self.processor.mfa(Path(self.preprocessed_root) / "mfa_data")
+            # 4. Create Dataset
+            if self.args.preprocess:
+                print("[INFO] Preprocess all utterances...")
+                self.processor.preprocess()
+            if self.args.create_dataset is not None:
+                print("[INFO] Creating Training and Validation Dataset...")
+                self.processor.split_dataset(self.args.create_dataset)
+
+    def print_message(self):
+        print("\n")
+        print("------ Preprocessing ------")
+        print(f"* Dataset     : {self.dataset}")
+        print(f"* Raw Data path   : {self.root}")
+        print(f"* Output path : {self.preprocessed_root}")
+        print("\n")
+        print(" [INFO] The following will be executed:")
+        if self.args.parse_raw:
+            print("* Parsing raw corpus")
+        if self.args.denoise:
+            print("* Denoising corpus")
+        if self.args.prepare_mfa:
+            print("* Preparing data for Montreal Force Alignment")
+        if self.args.mfa:
+            print("* Montreal Force Alignment")
+        if self.args.preprocess:
+            print("* Preprocess dataset")
+        if self.args.create_dataset is not None:
+            print("* Creating Training and Validation Dataset")
+        print("\n")
+
+
+def main(args):
+    Define.DEBUG = args.debug
+    P = Preprocessor(args)
+    P.exec(args.force)
 
 
 if __name__ == "__main__":
-    from sys import platform
-    if platform == "linux" or platform == "linux2":
-        set_start_method("spawn", force=True)
-    # preprocess("./preprocessed_data/AISHELL-3")
-    # preprocess("./preprocessed_data/CSS10/german")
-    # preprocess("./preprocessed_data/JSUT")
-    preprocess("./preprocessed_data/kss")
-    preprocess("./preprocessed_data/LibriTTS")
-    # preprocess("./preprocessed_data/GlobalPhone/french")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("raw_dir", type=str)
+    parser.add_argument("preprocessed_dir", type=str)
+
+    parser.add_argument("--dataset", type=str)
+    parser.add_argument("--parse_raw", action="store_true", default=False)
+    parser.add_argument("--denoise", action="store_true", default=False)
+    parser.add_argument("--prepare_mfa", action="store_true", default=False)
+    parser.add_argument("--mfa", action="store_true", default=False)
+    parser.add_argument("--preprocess", action="store_true", default=False)
+    parser.add_argument("--create_dataset", type=str, help="cleaned data_info path")
+    parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--force", action="store_true", default=False)
+    args = parser.parse_args()
+
+    main(args)

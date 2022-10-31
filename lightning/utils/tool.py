@@ -209,6 +209,8 @@ def read_queries_from_txt(path):
 
 def write_queries_to_txt(data_parser: DataParser, queries, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    data_parser.phoneme.read_all()
+    data_parser.text.read_all()
     lines = []
     for query in queries:
         line = [query["basename"], query["spk"]]

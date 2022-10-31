@@ -2,6 +2,7 @@ import os
 from tqdm import tqdm
 import json
 
+# TODO: not done yet (transposition problems...)
 
 class TATTTSRawParser(object):
     def __init__(self, root):

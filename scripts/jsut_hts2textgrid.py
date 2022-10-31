@@ -5,7 +5,7 @@ from nnmnkwii.io import hts
 
 
 label_dir = "/mnt/d/Data/jsut-lab"
-output_dir = "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT_new/TextGrid/jsut"
+output_dir = "/mnt/d/Projects/Few-Shot-Cross-Lingual-TTS/preprocessed_data/JSUT/TextGrid/jsut"
 os.makedirs(output_dir, exist_ok=True)
 for d in os.listdir(label_dir):
     if not os.path.isdir(f"{label_dir}/{d}") or d[0] == '.':
