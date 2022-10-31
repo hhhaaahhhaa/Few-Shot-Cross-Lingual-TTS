@@ -47,7 +47,7 @@ class BaselineTuneSystem(System):
         return saver
     
     # Tune Interface
-    def tune_init(self):
+    def tune_init(self, *args, **kwargs):
         # Freeze part of the model
         # self.model.freeze()
         self.lang_id = self.preprocess_config["lang_id"]

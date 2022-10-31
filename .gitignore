@@ -134,7 +134,12 @@ lightning_logs/
 /_*/
 /results/
 output/
+other/
+evaluation/output/
+evaluation/logits/
+MFA/
 preprocessed_data/*/
 *.npy
 *.csv
 *.swp
+*.sh

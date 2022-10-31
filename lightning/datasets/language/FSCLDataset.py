@@ -3,6 +3,8 @@ from torch.utils.data import Dataset
 import json
 import pickle
 
+from dlhlp_lib.utils.tool import segment2duration
+
 import Define
 from text import text_to_sequence
 from text.define import LANG_ID2SYMBOLS
@@ -87,14 +89,7 @@ class FSCLDataset(Dataset):
             avg_frames = self.data_parser.mfa_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
-            avg_frames = []
-            for (s, e) in segment:
-                avg_frames.append(
-                    int(
-                        np.round(e * 50)  # All ssl model use 20ms window
-                        - np.round(s * 50)
-                    )
-                )
+            avg_frames = segment2duration(segment, fp=0.02)
 
         sample.update({
             "lang_id": self.lang_id,
@@ -193,14 +188,7 @@ class UnsupFSCLDataset(Dataset):
                 avg_frames = self.data_parser.mfa_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
-            avg_frames = []
-            for (s, e) in segment:
-                avg_frames.append(
-                    int(
-                        np.round(e * 50)  # All ssl model use 20ms window
-                        - np.round(s * 50)
-                    )
-                )
+            avg_frames = segment2duration(segment, fp=0.02)
 
         sample.update({
             "lang_id": None,
@@ -236,9 +224,13 @@ class SSLUnitFSCLDataset(Dataset):
         self.unit_name = config["unit_name"]
         self.unit_parser = self.data_parser.ssl_units[self.unit_name]
 
-        with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
-            kmeans_model = pickle.load(f)
-            self.n_clusters = kmeans_model.cluster_centers_.shape[0]
+        try:
+            with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
+                kmeans_model = pickle.load(f)
+                self.n_clusters = kmeans_model.cluster_centers_.shape[0]
+        except:
+            self.n_clusters = 0
+        
         if self.map2phoneme:
             with open(f"{self.unit_parser.root}/centroids2phoneme.pkl", "rb") as f:
                 pairs = pickle.load(f)
@@ -315,14 +307,7 @@ class SSLUnitFSCLDataset(Dataset):
             avg_frames = self.unit_parser.dp_duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
-            avg_frames = []
-            for (s, e) in segment:
-                avg_frames.append(
-                    int(
-                        np.round(e * 50)  # All ssl model use 20ms window
-                        - np.round(s * 50)
-                    )
-                )
+            avg_frames = segment2duration(segment, fp=0.02)
 
         sample.update({
             "lang_id": self.lang_id,

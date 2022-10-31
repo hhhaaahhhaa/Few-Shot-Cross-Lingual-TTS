@@ -7,9 +7,9 @@ from .reference_extractor import *
 
 REFERENCE_EXTRACTORS = {
     "mel": MelExtractor, 
-    "hubert": HubertExtractor,
-    "wav2vec2": Wav2Vec2Extractor,
-    "xlsr53": XLSR53Extractor,
+    "hubert_large_ll60k": HubertExtractor,
+    "wav2vec2_large_ll60k": Wav2Vec2Extractor,
+    "wav2vec2_xlsr": XLSR53Extractor,
 }
 
 

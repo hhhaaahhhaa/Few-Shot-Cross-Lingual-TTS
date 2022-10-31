@@ -1,6 +1,7 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import LearningRateMonitor, GPUStatsMonitor, ModelCheckpoint
 
+import Define
 from lightning.callbacks import GlobalProgressBar
 from lightning.optimizer import get_optimizer
 from lightning.scheduler import get_scheduler
@@ -11,7 +12,10 @@ class System(pl.LightningModule):
 
     default_monitor: str = "val_loss"
 
-    def __init__(self, preprocess_config, model_config, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(
+        self, preprocess_config, model_config, train_config, algorithm_config,
+        log_dir, result_dir, ckpt_dir=None
+    ):
         super().__init__()
         self.preprocess_config = preprocess_config
         self.model_config = model_config
@@ -21,8 +25,12 @@ class System(pl.LightningModule):
 
         self.log_dir = log_dir
         self.result_dir = result_dir
+        self.ckpt_dir = ckpt_dir
         
         self.build_model()
+        if Define.DEBUG:
+            print("Model structure:")
+            print(self)
 
     def build_model(self):
         """ Build all components here. """
@@ -40,6 +48,7 @@ class System(pl.LightningModule):
         # Checkpoint saver
         save_step = self.train_config["step"]["save_step"]
         checkpoint = ModelCheckpoint(
+            dirpath=self.ckpt_dir,
             monitor="Val/Total Loss", mode="min",
             every_n_train_steps=save_step, save_top_k=-1
         )

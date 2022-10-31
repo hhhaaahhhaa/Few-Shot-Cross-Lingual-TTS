@@ -26,8 +26,7 @@ class SSLPRCollate(object):
 
         repr_info = {}
         repr_info["wav"] = [torch.from_numpy(data[idx]["wav"]).float() for idx in idx_arr]
-        lang_id = data[0]["lang_id"]
         repr_info["n_symbols"] = data[0]["n_symbols"]
-        repr_info["lang_id"] = lang_id
+        repr_info["lang_id"] = data[0]["lang_id"]
 
         return (labels, repr_info)

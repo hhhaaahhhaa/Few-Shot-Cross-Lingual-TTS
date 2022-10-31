@@ -1,9 +1,9 @@
 import numpy as np
 from torch.utils.data import Dataset
 import json
-import pickle
 
-import Define
+from dlhlp_lib.utils.tool import segment2duration
+
 from text import text_to_sequence
 from text.define import LANG_ID2SYMBOLS
 from Parsers.parser import DataParser
@@ -116,14 +116,7 @@ class SSLPRDataset(Dataset):
         }
 
         segment = self.data_parser.mfa_segment.read_from_query(query)
-        avg_frames = []
-        for (s, e) in segment:
-            avg_frames.append(
-                int(
-                    np.round(e * 50)  # All ssl model use 20ms window
-                    - np.round(s * 50)
-                )
-            )
+        avg_frames = segment2duration(segment, fp=0.02)
         phonemes = self.data_parser.phoneme.read_from_query(query)
         raw_text = self.data_parser.text.read_from_query(query)
         phonemes = f"{{{phonemes}}}"
@@ -146,7 +139,8 @@ class SSLPRDataset(Dataset):
         sample = {
             "id": basename,
             "speaker": speaker_id,
-            "text": expanded_text,
+            "text": text,
+            "expanded_text": expanded_text,
             "raw_text": raw_text,
             "wav": raw_feat,
             "duration": duration,

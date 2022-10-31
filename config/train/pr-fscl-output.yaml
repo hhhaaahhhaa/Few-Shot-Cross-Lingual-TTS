@@ -1,0 +1,4 @@
+path:
+  ckpt_path: "./output/ckpt/pr-fscl"
+  log_path: "./output/log/pr-fscl"
+  result_path: "./output/result/pr-fscl"

@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
 from lightning.collates import LanguageCollate, TextCollate
-from lightning.datasets.language import FastSpeech2Dataset, TextDataset, SSLUnitPseudoLabelDataset, NoisyFastSpeech2Dataset
+from lightning.datasets.language import FastSpeech2Dataset, TextDataset, SSLUnitPseudoLabelDataset, SSLUnitFSCLDataset, NoisyFastSpeech2Dataset
 from ..utils import EpisodicInfiniteWrapper
 
 
@@ -36,15 +36,18 @@ class FastSpeech2DataModule(pl.LightningDataModule):
 
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
-                self.dataset_cls(
+                # self.dataset_cls(
+                FastSpeech2Dataset(
                 # NoisyFastSpeech2Dataset(
+                # SSLUnitPseudoLabelDataset(
+                # SSLUnitFSCLDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config, spk_refer_wav=spk_refer_wav
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
-                self.dataset_cls(
+                FastSpeech2Dataset(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config, spk_refer_wav=spk_refer_wav
@@ -115,8 +118,10 @@ class FastSpeech2DataModule(pl.LightningDataModule):
 
 class FastSpeech2TuneDataModule(FastSpeech2DataModule):
     def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
-        super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset)
+        # super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset)
 
-        # SSL Units but mapped to phonemes
+        # SSL Units but mapped to phonemes (including identity map)
         # super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitPseudoLabelDataset)
+        super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
+
         self.re_id = False

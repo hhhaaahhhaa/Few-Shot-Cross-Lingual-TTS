@@ -1,124 +1,92 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 
 from dlhlp_lib.s3prl import S3PRLExtractor
 
-from lightning.systems.adaptor import AdaptorSystem
-from lightning.utils.log import loss2dict
-from lightning.utils.tool import LightningMelGAN
-from lightning.model.phoneme_embedding import PhonemeEmbedding
-from lightning.model import FastSpeech2Loss, FastSpeech2
-from lightning.model import get_reference_extractor_cls
-from lightning.callbacks.language.fscl_saver import Saver
 import Define
-from transformer import Constants
+from text.define import LANG_ID2SYMBOLS
+from lightning.systems.system import System
+from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
+from lightning.utils.tool import ssl_match_length
+from .modules import PRFramewiseLoss
+from .downstreams import *
+from .heads import *
+from .SSLBaseline import training_step_template, validation_step_template
 
 
-class SSLBaselineTuneSystem(AdaptorSystem):
+class SSLBaselineTuneSystem(System):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # tests
+        self.test_list = {}
+
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
-        self.downstream = None # BiLSTM
-        self.head = None
-        self.embedding_model = PhonemeEmbedding(self.model_config, self.algorithm_config)
-        self.model = FastSpeech2(self.preprocess_config, self.model_config, self.algorithm_config)
-        self.loss_func = FastSpeech2Loss(self.preprocess_config, self.model_config)
-
-        self.vocoder = LightningMelGAN()
-        self.vocoder.freeze()
-
-        self.reference_extractor = get_reference_extractor_cls(Define.UPSTREAM)()
-        self.reference_extractor.freeze()
+        self.downstream = Downstream1(
+            self.model_config,
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            specific_layer=Define.LAYER_IDX
+        )
+        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
+        
+        self.loss_func = PRFramewiseLoss()
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.embedding_model, self.model])
+        return nn.ModuleList([self.head])
 
     def build_saver(self):
         saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
         return saver
-    
-    def init_codebook_type(self):        
-        codebook_config = self.algorithm_config["adapt"]["phoneme_emb"]
-        if codebook_config["type"] == "embedding":
-            self.codebook_type = "table-sep"
-        elif codebook_config["type"] == "codebook":
-            self.codebook_type = codebook_config["attention"]["type"]
-        else:
-            raise NotImplementedError
-        self.adaptation_steps = self.algorithm_config["adapt"]["train"]["steps"]
 
-    def build_embedding_table(self, batch):
-        _, _, repr_info, lang_id = batch[0]
-        with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
-
-        embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-        embedding = embedding.squeeze(0)
-        embedding[Constants.PAD].fill_(0)
-
-        if Define.DEBUG:
-            print("Embedding shape and gradient required: ", embedding.shape)
-            print(embedding.requires_grad)
-        return embedding
+    # Tune Interface
+    def tune_init(self, *args, **kwargs):
+        self.lang_id = self.preprocess_config["lang_id"]
+        print("Current language: ", self.lang_id)
+        # self.head.heads[f"head-{self.lang_id}"] = nn.Linear(self.head.d_in, len(LANG_ID2SYMBOLS[self.lang_id]))  # dirty
 
     def common_step(self, batch, batch_idx, train=True):
-        if Define.DEBUG:
-            print("Extract embedding... ")
-        emb_table = self.build_embedding_table(batch)
-        _, qry_batch, _, _ = batch[0]
-        qry_batch = qry_batch[0]
-        emb_texts = F.embedding(qry_batch[3], emb_table, padding_idx=0)
-        output = self.model(qry_batch[2], emb_texts, *(qry_batch[4:]))
-        loss = self.loss_func(qry_batch, output)
-        return loss, output
+        labels, repr_info = batch
+
+        self.upstream.eval()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract(repr_info["wav"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, labels[5])
+            ssl_repr = ssl_repr.detach()
+        
+        # print(ssl_repr.shape)
+        # print(labels[3].shape)
+
+        x = self.downstream(ssl_repr, labels[4].cpu())
+       
+        output = self.head(x, lang_id=repr_info["lang_id"])
+        loss = self.loss_func(labels, output)
+        loss_dict = {
+            "Total Loss": loss,
+        }
+
+        return loss_dict, output
 
     def training_step(self, batch, batch_idx):
-        train_loss, predictions = self.common_step(batch, batch_idx, train=True)
-        qry_batch = batch[0][1][0]
-
-        # Log metrics to CometLogger
-        loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
-        self.log_dict(loss_dict, sync_dist=True)
-        return {'loss': train_loss[0], 'losses': train_loss, 'output': predictions, '_batch': qry_batch}
-
-    def validation_step(self, batch, batch_idx):
-        self.log_matching(batch, batch_idx)
-        val_loss, predictions = self.common_step(batch, batch_idx)
-        qry_batch = batch[0][1][0]
-
-        # Log metrics to CometLogger
-        loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
-        self.log_dict(loss_dict, sync_dist=True)
-        return {'losses': val_loss, 'output': predictions, '_batch': qry_batch}
+        labels, repr_info = batch
+        return training_step_template(self, batch, batch_idx, labels, repr_info)
     
-    def visualize_matching(self, batch, batch_idx):
-        if self.codebook_type != "table-sep":
-            _, _, repr_info, lang_id = batch[0]
-            with torch.no_grad():
-                ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
-            matching = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-            self.codebook_analyzer.visualize_matching(batch_idx, matching)
-        return None
+    def validation_step(self, batch, batch_idx):
+        labels, repr_info = batch
+        return validation_step_template(self, batch, batch_idx, labels, repr_info)
 
-    def log_matching(self, batch, batch_idx, stage="val"):
-        step = self.global_step + 1
-        _, _, repr_info, lang_id = batch[0]
-        with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
-        
-        matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-        for matching in matchings:
-            fig = self.codebook_analyzer.plot_matching(matching, quantized=False)
-            figure_name = f"{stage}/step_{step}_{batch_idx:03d}_{matching['title']}"
-            self.logger.experiment.log_figure(
-                figure_name=figure_name,
-                figure=fig,
-                step=step,
-            )
-            plt.close(fig)
+
+class SSLClusterTuneSystem(SSLBaselineTuneSystem):
+    """
+    This class only replace the MultilingualPRHead with MultilingualClusterHead.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def build_model(self):
+        super().build_model()
+        self.head = MultilingualClusterHead(LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"])

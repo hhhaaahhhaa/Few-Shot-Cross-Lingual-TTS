@@ -109,9 +109,12 @@ def reprocess_pr(data, idxs, mode="sup"):
     speakers = np.array(speakers)
 
     texts = [data[idx]["text"] for idx in idxs]
+    expanded_texts = [data[idx]["expanded_text"] for idx in idxs]
     raw_texts = [data[idx]["raw_text"] for idx in idxs]
     text_lens = np.array([text.shape[0] for text in texts])
+    expanded_text_lens = np.array([expanded_text.shape[0] for expanded_text in expanded_texts])
     texts = pad_1D(texts)
+    expanded_texts = pad_1D(expanded_texts)
 
     durations = [data[idx]["duration"] for idx in idxs]
     durations = pad_1D(durations)
@@ -123,6 +126,9 @@ def reprocess_pr(data, idxs, mode="sup"):
             ids,
             raw_texts,
             speaker_args,
+            torch.from_numpy(expanded_texts).long(),
+            torch.from_numpy(expanded_text_lens),
+            max(expanded_text_lens),
             torch.from_numpy(texts).long(),
             torch.from_numpy(text_lens),
             max(text_lens),
