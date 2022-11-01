@@ -93,7 +93,6 @@ def preprocess(data_parser: DataParser, queries):
         json.dump(stats, f)
     
     # Generate cache
-    data_parser.text.read_all(refresh=True)
     data_parser.phoneme.read_all(refresh=True)
     data_parser.mfa_segment.read_all(refresh=True)
     data_parser.mfa_duration_avg_energy.read_all(refresh=True)

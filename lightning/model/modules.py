@@ -16,34 +16,32 @@ import Define
 class VarianceAdaptor(nn.Module):
     """ Variance Adaptor """
 
-    def __init__(self, preprocess_config, model_config):
+    def __init__(self, model_config):
         super(VarianceAdaptor, self).__init__()
         self.duration_predictor = VariancePredictor(model_config)
         self.length_regulator = LengthRegulator()
         self.pitch_predictor = VariancePredictor(model_config)
         self.energy_predictor = VariancePredictor(model_config)
 
-        self.pitch_feature_level = preprocess_config["preprocessing"]["pitch"][
-            "feature"
-        ]
-        self.energy_feature_level = preprocess_config["preprocessing"]["energy"][
-            "feature"
-        ]
+        self.pitch_feature_level = model_config["pitch"]["feature"]
+        self.energy_feature_level = model_config["energy"]["feature"]
         assert self.pitch_feature_level in ["phoneme_level", "frame_level"]
         assert self.energy_feature_level in ["phoneme_level", "frame_level"]
 
         pitch_quantization = model_config["variance_embedding"]["pitch_quantization"]
         energy_quantization = model_config["variance_embedding"]["energy_quantization"]
         n_bins = model_config["variance_embedding"]["n_bins"]
-        assert pitch_quantization in ["linear", "log"]
-        assert energy_quantization in ["linear", "log"]
+        assert pitch_quantization in ["linear", "log"], "default use linear"
+        assert energy_quantization in ["linear", "log"], "default use linear"
 
-        # Since pitch and energy are normalized, min/max need to be normalized, too
+        # If pitch and energy are normalized, min/max need to be normalized, too
         pitch_min, pitch_max, pitch_mean, pitch_std, energy_min, energy_max, energy_mean, energy_std = Define.ALLSTATS["global"]
-        pitch_min = (pitch_min - pitch_mean) / pitch_std
-        pitch_max = (pitch_max - pitch_mean) / pitch_std
-        energy_min = (energy_min - energy_mean) / energy_std
-        energy_max = (energy_max - energy_mean) / energy_std
+        if model_config["pitch"]["normalization"]:
+            pitch_min = (pitch_min - pitch_mean) / pitch_std
+            pitch_max = (pitch_max - pitch_mean) / pitch_std
+        if model_config["energy"]["normalization"]:
+            energy_min = (energy_min - energy_mean) / energy_std
+            energy_max = (energy_max - energy_mean) / energy_std
 
         if pitch_quantization == "log":
             self.pitch_bins = nn.Parameter(

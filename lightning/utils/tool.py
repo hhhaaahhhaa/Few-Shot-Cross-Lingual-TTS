@@ -10,18 +10,9 @@ import matplotlib
 from matplotlib import pyplot as plt
 matplotlib.use("Agg")
 
-from Parsers.parser import DataParser
 from text import text_to_sequence
 from text.define import LANG_ID2SYMBOLS
 import Define
-
-
-def numpy_exist_nan(x: np.array):
-    return np.any(np.isnan(x))
-
-
-def torch_exist_nan(x: torch.Tensor):
-    return (x != x).any()
 
 
 class LightningMelGAN(pl.LightningModule):
@@ -89,9 +80,7 @@ def plot_mel(data, stats, titles):
     fig, axes = plt.subplots(len(data), 1, squeeze=False)
     if titles is None:
         titles = [None for i in range(len(data))]
-    pitch_min, pitch_max, pitch_mean, pitch_std, energy_min, energy_max = stats
-    pitch_min = pitch_min * pitch_std + pitch_mean
-    pitch_max = pitch_max * pitch_std + pitch_mean
+    pitch_min, pitch_max, _, _, energy_min, energy_max, _, _ = stats
 
     def add_axis(fig, old_ax):
         ax = fig.add_axes(old_ax.get_position(), anchor="W")
@@ -101,7 +90,6 @@ def plot_mel(data, stats, titles):
     fig.subplots_adjust(hspace=0.3)
     for i in range(len(data)):
         mel, pitch, energy = data[i]
-        pitch = pitch * pitch_std + pitch_mean
         axes[i][0].imshow(mel, origin="lower")
         axes[i][0].set_aspect(2.5, adjustable="box")
         axes[i][0].set_ylim(0, mel.shape[0])
@@ -207,23 +195,29 @@ def read_queries_from_txt(path):
     return res
 
 
-def write_queries_to_txt(data_parser: DataParser, queries, path):
+def write_queries_to_txt(data_parser, queries, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data_parser.phoneme.read_all()
     data_parser.text.read_all()
     lines = []
     for query in queries:
-        line = [query["basename"], query["spk"]]
-        line.append(f"{{{data_parser.phoneme.read_from_query(query)}}}")
-        line.append(data_parser.text.read_from_query(query))
-        lines.append(line)
+        try:
+            line = [query["basename"], query["spk"]]
+            line.append(f"{{{data_parser.phoneme.read_from_query(query)}}}")
+            line.append(data_parser.text.read_from_query(query))
+            lines.append(line)
+        except:
+            print("Please delete phoneme cache and text cache and try again.")
+            print("If not working, phoneme feature/text feature does not contain such query.")
+            print("Failed: ", query)
+            raise
     with open(path, "w", encoding="utf-8") as f:
         for line in lines:
             f.write("|".join(line))
             f.write('\n')
 
 
-def generate_reference(path, data_parser: DataParser, lang_id):
+def generate_reference(path, data_parser, lang_id):
     """
     Generate information similar to those from dataloader, which are inputs of refernece extractors.
     """

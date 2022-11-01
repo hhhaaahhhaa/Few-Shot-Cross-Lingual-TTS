@@ -10,6 +10,7 @@ def collect_phonemes(data_dirs) -> Set[str]:
     for data_dir in data_dirs:
         data_parser = DataParser(data_dir)
         queries = data_parser.get_all_queries()
+        data_parser.phoneme.read_all()
         for query in tqdm(queries):
             try:
                 phn_seq = data_parser.phoneme.read_from_query(query)

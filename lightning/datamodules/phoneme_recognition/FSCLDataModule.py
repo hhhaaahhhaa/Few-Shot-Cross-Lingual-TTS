@@ -16,9 +16,10 @@ class FSCLDataModule(pl.LightningDataModule):
     Val: FSCLDataset + FSCLCollate.
     Test: TextDataset.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 

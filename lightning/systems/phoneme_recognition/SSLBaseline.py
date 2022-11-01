@@ -7,11 +7,11 @@ import jiwer
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
-from text.define import LANG_ID2SYMBOLS
+from lightning.build import build_id2symbols
 from lightning.systems.system import System
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.utils.tool import ssl_match_length
-from .modules import PRFramewiseLoss
+from .loss import PRFramewiseLoss
 from .downstreams import *
 from .heads import *
 
@@ -30,7 +30,8 @@ class SSLBaselineSystem(System):
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX
         )
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
+        self.head = MultilingualPRHead(
+            build_id2symbols(self.data_configs), d_in=self.model_config["transformer"]["d_model"])
         
         self.loss_func = PRFramewiseLoss()
 
@@ -38,7 +39,7 @@ class SSLBaselineSystem(System):
         return nn.ModuleList([self.downstream, self.head])
 
     def build_saver(self):
-        saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
+        saver = Saver(self.data_configs, self.log_dir, self.result_dir)
         return saver
 
     def common_step(self, batch, batch_idx, train=True):
@@ -93,7 +94,8 @@ class SSLClusterSystem(SSLBaselineSystem):
     
     def build_model(self):
         super().build_model()
-        self.head = MultilingualClusterHead(LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"])
+        self.head = MultilingualClusterHead(
+            build_id2symbols(self.data_configs), self.model_config["transformer"]["d_model"])
 
 
 """
@@ -117,7 +119,7 @@ def validation_step_template(pl_module, batch, batch_idx, labels, repr_info):
 
     # Use default beam search decoder for ctc
     if (getattr(pl_module, "use_ctc", None) is not None) and getattr(pl_module, "use_ctc", None):
-        ctc_decoder = Define.get_ctc_decoder(repr_info["lang_id"])
+        ctc_decoder = Define.CTC_DECODERS(repr_info["lang_id"])
         emissions = torch.log_softmax(predictions.detach().cpu(), dim=2)
         beam_search_results = ctc_decoder(emissions, labels[4].cpu())
         acc = 0

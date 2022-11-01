@@ -10,17 +10,18 @@ def german_scripts():
     mfa_data_dir = Path("preprocessed_data/CSS10/german/mfa_data")
     raw_parser = get_raw_parser("CSS10")(raw_dir, preprocessed_dir)
     prepocessor = get_preprocessor("CSS10")(preprocessed_dir)
-    raw_parser.parse(n_workers=8)
-    prepocessor.prepare_mfa(mfa_data_dir)
+    # raw_parser.parse(n_workers=8)
+    # prepocessor.prepare_mfa(mfa_data_dir)
 
-    # generate dictionary
+    # # generate dictionary
     dictionary_path = "lexicon/css10-de-lexicon.txt"
-    os.system("mfa models download g2p german_mfa")
-    os.system(f"mfa g2p german_mfa {str(mfa_data_dir)} {dictionary_path} --clean")
+    # os.system("mfa models download g2p german_mfa")
+    # os.system(f"mfa g2p german_mfa {str(mfa_data_dir)} {dictionary_path} --clean")
     
     # generate mfa align model
+    os.system("mfa models download acoustic german_mfa")
     output_paths = "MFA/German/css10-de_acoustic_model.zip"
-    cmd = f"mfa train {str(mfa_data_dir)} {dictionary_path} {output_paths} -j 8 -v --clean"
+    cmd = f"mfa adapt {str(mfa_data_dir)} {dictionary_path} german_mfa {output_paths} -j 8 -v --clean"
     os.system(cmd)
 
 
@@ -86,7 +87,7 @@ def dutch_scripts():
 
 
 if __name__ == "__main__":
-    # german_scripts()
     # french_scripts()
-    spanish_scripts()
+    german_scripts()
+    # spanish_scripts()
     # dutch_scripts()

@@ -22,7 +22,7 @@ class JSUTRawParser(BaseRawParser):
         template.prepare_initial_features(self.data_parser, query, data)
 
     def parse(self, n_workers=4):
-        res = {"data": [], "data_info": [], "all_speakers": []}
+        res = {"data": [], "data_info": [], "all_speakers": ["jsut"]}
 
         path = f"{self.root}/basic5000/transcript_utf8.txt"
         speaker = "jsut"
@@ -60,6 +60,7 @@ class JSUTRawParser(BaseRawParser):
         with Pool(processes=n_workers) as pool:
             for res in tqdm(pool.imap(ImapWrapper(self.prepare_initial_features), tasks, chunksize=64), total=n):
                 pass
+        self.data_parser.text.read_all(refresh=True)
 
 
 class JSUTPreprocessor(BasePreprocessor):

@@ -32,6 +32,8 @@ multi_lingual: True
 
 max_seq_len: 1000
 
+speaker_emb: dvec
+
 vocoder:
   model: "MelGAN"
   speaker: "universal" # support  'LJSpeech', 'universal'

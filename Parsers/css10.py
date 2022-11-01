@@ -6,6 +6,7 @@ from multiprocessing import Pool
 
 from dlhlp_lib.tts_preprocess.utils import ImapWrapper
 from dlhlp_lib.tts_preprocess.basic import *
+from dlhlp_lib.text.utils import lowercase
 
 import Define
 from Parsers.interface import BaseRawParser, BasePreprocessor
@@ -69,6 +70,7 @@ class CSS10RawParser(BaseRawParser):
         with Pool(processes=n_workers) as pool:
             for res in tqdm(pool.imap(ImapWrapper(self.prepare_initial_features), tasks, chunksize=64), total=n):
                 pass
+        self.data_parser.text.read_all(refresh=True)
 
 
 class CSS10Preprocessor(BasePreprocessor):
@@ -79,6 +81,7 @@ class CSS10Preprocessor(BasePreprocessor):
 
     def prepare_mfa(self, mfa_data_dir: Path):
         queries = self.data_parser.get_all_queries()
+        self.data_parser.text.read_all()
 
         # 1. create a similar structure in "mfa_data_dir" as in "wav_dir"
         for spk in self.data_parser.get_all_speakers():
@@ -91,14 +94,13 @@ class CSS10Preprocessor(BasePreprocessor):
             link_file = target_dir / f"{query['basename']}.wav"
             txt_link_file = target_dir / f"{query['basename']}.txt"
             wav_file = self.data_parser.wav_16000.read_filename(query, raw=True)
-            txt_file = self.data_parser.text.read_filename(query, raw=True)
+            txt = self.data_parser.text.read_from_query(query)
             
             if link_file.exists():
                 os.unlink(str(link_file))
-            if txt_link_file.exists():
-                os.unlink(str(txt_link_file))
             os.link(wav_file, str(link_file))
-            os.link(txt_file, str(txt_link_file))
+            with open(txt_link_file, 'w', encoding="utf-8") as f:
+                f.write(lowercase(txt))
 
     def mfa(self, mfa_data_dir: Path):
         corpus_directory = str(mfa_data_dir)

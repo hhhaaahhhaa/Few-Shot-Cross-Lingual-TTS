@@ -7,32 +7,42 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
-import Define
+from dlhlp_lib.audio import AUDIO_CONFIG
+
 from transformer import Decoder, PostNet, Encoder2
 from .modules import VarianceAdaptor
-from .speaker_encoder import SpeakerEncoder
-from .phoneme_embedding import PhonemeEmbedding, HardAttCodebook, SoftAttCodebook, TablePhonemeEmbedding, SoftAttCodebook2
+from .speaker_encoder import SpeakerEncoder, LanguageEncoder
 from lightning.utils.tool import get_mask_from_lengths
 
 
 class FastSpeech2(pl.LightningModule):
     """ Modified FastSpeech2 """
 
-    def __init__(self, preprocess_config, model_config, algorithm_config):
+    def __init__(self, model_config, **kwargs):
         super(FastSpeech2, self).__init__()
         self.model_config = model_config
 
         self.encoder = Encoder2(model_config)
-        self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
+        self.variance_adaptor = VarianceAdaptor(model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
             model_config["transformer"]["decoder_hidden"],
-            preprocess_config["preprocessing"]["mel"]["n_mel_channels"],
+            AUDIO_CONFIG["mel"]["n_mel_channels"]
         )
         self.postnet = PostNet()
 
         # If not using multi-speaker, would return None
-        self.speaker_emb = SpeakerEncoder(preprocess_config, model_config, algorithm_config)
+        if not model_config.get("multi_speaker", False):
+            self.speaker_emb = None
+        else:
+            self.speaker_emb = SpeakerEncoder(model_config, kwargs["spk_config"])
+
+        # If not using multi-lingual, would return None
+        if not model_config.get("multi_lingual", False):
+            self.language_emb = None
+        else:
+            # currently fixed, enable up to 100 languages
+            self.language_emb = LanguageEncoder(model_config, {"emb_type": "table"})
 
     def forward(
         self,
@@ -61,9 +71,11 @@ class FastSpeech2(pl.LightningModule):
         # print("FastSpeech2m input shape: ", texts.shape)
         # print("FastSpeech2m mask shape: ", src_masks.shape)
         output = self.encoder(texts, src_masks)
+        # print("FastSpeech2m encoder output shape: ", output.shape)
 
         if self.speaker_emb is not None:
             spk_emb = self.speaker_emb(speaker_args)
+            # print("FastSpeech2m spk_emb shape: ", spk_emb.shape)
             if average_spk_emb:
                 spk_emb = spk_emb.mean(dim=0, keepdim=True).expand(output.shape[0], -1)
             output += spk_emb.unsqueeze(1).expand(-1, max_src_len, -1)
@@ -91,6 +103,7 @@ class FastSpeech2(pl.LightningModule):
             e_control,
             d_control,
         )
+        # print("FastSpeech2m variance adaptor output shape: ", output.shape)
 
         if self.speaker_emb is not None:
             spk_emb = self.speaker_emb(speaker_args)
@@ -102,6 +115,7 @@ class FastSpeech2(pl.LightningModule):
             # )
 
         output, mel_masks = self.decoder(output, mel_masks)
+        # print(output.shape)
         output = self.mel_linear(output)
 
         postnet_output = self.postnet(output) + output

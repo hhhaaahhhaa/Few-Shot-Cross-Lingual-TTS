@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from text.define import LANG_NAME2ID
 from lightning.utils.tool import pad_1D, pad_2D
 
 
@@ -13,7 +14,9 @@ def reprocess(data, idxs, mode="sup"):
     """
     ids = [data[idx]["id"] for idx in idxs]
     speakers = [data[idx]["speaker"] for idx in idxs]
+    lang_ids = [LANG_NAME2ID[data[idx]["lang_id"]] for idx in idxs]
     speakers = np.array(speakers)
+    lang_ids = np.array(lang_ids)
 
     if mode in ["sup", "inference"]:
         texts = [data[idx]["text"] for idx in idxs]
@@ -55,6 +58,15 @@ def reprocess(data, idxs, mode="sup"):
     else:
         speaker_args = torch.from_numpy(speakers).long()
 
+    # print(len(ids))
+    # print(len(raw_texts))
+    # print(texts.shape)
+    # print(len(text_lens))
+    # print(mels.shape)
+    # print(pitches.shape)
+    # print(energies.shape)
+    # print(durations.shape)
+
     if mode == "sup":
         return (
             ids,
@@ -69,6 +81,7 @@ def reprocess(data, idxs, mode="sup"):
             torch.from_numpy(pitches).float(),
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
+            torch.from_numpy(lang_ids).long(),
         )
     elif mode == "unsup":
         return (

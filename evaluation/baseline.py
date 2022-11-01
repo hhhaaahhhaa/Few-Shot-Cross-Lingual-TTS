@@ -6,10 +6,10 @@ import pytorch_lightning as pl
 import scipy
 from tqdm import tqdm
 import pickle
+import json
 import gc
 
 from dlhlp_lib.algorithm.dpdp import DPDPDecoder
-from dlhlp_lib.parsers.preprocess import *
 from dlhlp_lib.utils.numeric import torch_exist_nan
 
 import Define

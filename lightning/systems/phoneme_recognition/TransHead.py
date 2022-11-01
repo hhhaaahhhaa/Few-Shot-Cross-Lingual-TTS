@@ -9,7 +9,6 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-# from .modules import BiLSTMDownstream, SoftAttCodebook, PRFramewiseLoss
 from lightning.model.reduction import PhonemeQueryExtractor
 
 

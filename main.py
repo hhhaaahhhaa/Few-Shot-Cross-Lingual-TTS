@@ -11,9 +11,9 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from pytorch_lightning.profiler import AdvancedProfiler
 from Objects.config import LanguageDataConfigReader
-from Parsers.parser import DataParser
 
 from config.comet import COMET_CONFIG
+from lightning.build import build_data_parsers, build_id2symbols
 from lightning.datamodules import get_datamodule
 from lightning.systems import get_system
 import Define
@@ -38,15 +38,15 @@ TRAINER_CONFIG = {
     "process_position": 1,
     "profiler": 'simple',
 }
-if Define.DEBUG:
-    TRAINER_CONFIG.update({
-        "limit_train_batches": 200,  # Useful for debugging
-        "limit_val_batches": 50,  # Useful for debugging
-    })
 
 
 def main(args, configs):
     print("Prepare training ...")
+    if Define.DEBUG:
+        TRAINER_CONFIG.update({
+            "limit_train_batches": 200,  # Useful for debugging
+            "limit_val_batches": 50,  # Useful for debugging
+        })
 
     preprocess_configs, model_config, train_config, algorithm_config = configs
 
@@ -67,20 +67,21 @@ def main(args, configs):
     else:
         data_configs = preprocess_configs
 
-    # register parsers, merge normalization stats
-    import json
-    keys = []
-    for data_config in data_configs:
-        Define.DATAPARSERS[data_config["name"]] = DataParser(data_config["data_dir"])
-        data_parser = Define.DATAPARSERS[data_config["name"]]
-        with open(data_parser.stats_path) as f:
-            stats = json.load(f)
-            stats = stats["pitch"] + stats["energy"]
-            Define.ALLSTATS[data_config["name"]] = stats
-            keys.append(data_config["name"])
-    Define.ALLSTATS["global"] = Define.merge_stats(Define.ALLSTATS, keys)
+    # register parsers
+    build_data_parsers(data_configs)
+
+    # Check id2symbols mapping manually
     if Define.DEBUG:
-        print("Initialize data parsers and build normalize stats, done.")
+        print(build_id2symbols(data_configs))
+
+    # Determine to use frame-level/phoneme-level pitch and energy in FastSpeech2
+    if "pitch" in model_config and "energy" in model_config:
+        for data_config in data_configs:
+            data_config["pitch"] = model_config["pitch"]
+            data_config["energy"] = model_config["energy"]
+
+    if Define.DEBUG:
+        print("Initialize data parsers, done.")
     #==========================================================
 
     # for p in train_config["path"].values():
@@ -103,7 +104,6 @@ def main(args, configs):
     trainer_training_config = {
         'max_steps': train_config["step"]["total_step"],
         'log_every_n_steps': train_config["step"]["log_step"],
-        # 'weights_save_path': train_config["path"]["ckpt_path"],
         'gradient_clip_val': train_config["optimizer"]["grad_clip_thresh"],
         'accumulate_grad_batches': train_config["optimizer"]["grad_acc_step"],
         'resume_from_checkpoint': ckpt_file,
@@ -122,7 +122,7 @@ def main(args, configs):
                 **COMET_CONFIG
             )
             comet_logger.log_hyperparams({
-                "preprocess_config": preprocess_configs,
+                "data_config": data_configs,
                 "model_config": model_config,
                 "train_config": train_config,
                 "algorithm_config": algorithm_config,
@@ -160,33 +160,33 @@ def main(args, configs):
     # Get dataset
     # TODO: Refactor semi systems and non-semi systems in to same parsing process.
     # TODO: Separate data_config from preprocess_config.
-    if "semi" in algorithm_config["type"]:
-        config_reader = LanguageDataConfigReader()
-        data_configs = {
-            # "sup": data_configs,
-            "sup": [config_reader.read("_data/JSUT/4-shot/task-0")],
-            "unsup": data_configs,
-        }
+    # if "semi" in algorithm_config["type"]:
+    #     config_reader = LanguageDataConfigReader()
+    #     data_configs = {
+    #         # "sup": data_configs,
+    #         "sup": [config_reader.read("_data/JSUT/4-shot/task-0")],
+    #         "unsup": data_configs,
+    #     }
+
     datamodule = get_datamodule(algorithm_config["type"])(
-        data_configs, train_config, algorithm_config, log_dir, result_dir
+        data_configs, model_config, train_config, algorithm_config, log_dir, result_dir
     )
 
     if Define.DEBUG:
         print("All components except system module are prepared.")
         input()
     if args.stage == 'train':
-        # Get model
         system = get_system(algorithm_config["type"])
-        # TODO: pretrain model is different to resume training
+        # Load pretrained weights
         if pretrain_ckpt_file is None:
             model = system(
-                preprocess_configs[0], model_config, train_config, algorithm_config,
+                data_configs, model_config, train_config, algorithm_config,
                 log_dir, result_dir, ckpt_dir
             )
         else:
             model = system.load_from_checkpoint(
                 pretrain_ckpt_file, 
-                preprocess_config=preprocess_configs[0], model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
+                data_configs=data_configs, model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
                 log_dir=log_dir, result_dir=result_dir, ckpt_dir=ckpt_dir
             )
 
@@ -310,8 +310,10 @@ if __name__ == "__main__":
         default="hubert_large_ll60k",
     )
     parser.add_argument("--use_comet", action="store_true", default=False)
+    parser.add_argument("--debug", action="store_true", default=False)
 
     args = parser.parse_args()
+    Define.DEBUG = args.debug
     Define.USE_COMET = args.use_comet
     Define.LAYER_IDX = args.layer_exp
     Define.set_upstream(args.upstream_exp)

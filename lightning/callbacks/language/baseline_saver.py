@@ -2,28 +2,41 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from Define import USE_COMET
 import pytorch_lightning as pl
 from pytorch_lightning.loggers.base import merge_dicts
 from pytorch_lightning.utilities import rank_zero_only
+from typing import List
 
+from dlhlp_lib.audio import AUDIO_CONFIG
+from dlhlp_lib.vocoders import get_vocoder
+
+import Define
 from ..base_saver import BaseSaver
-from lightning.utils.log import loss2dict, synth_one_sample_with_target, synth_samples
+from lightning.utils.log import synth_one_sample_with_target, synth_samples
 
 
-CSV_COLUMNS = ["Total Loss", "Mel Loss", "Mel-Postnet Loss", "Pitch Loss", "Energy Loss", "Duration Loss"]
+CSV_COLUMNS = ["Total Loss"]
 COL_SPACE = [len(col) for col in ["200000", "Validation"]+CSV_COLUMNS]  # max step: 200000, longest stage: validation
 
 
-class Saver(BaseSaver):
+def set_format(keys: List[str]):
+    global CSV_COLUMNS, COL_SPACE
+    CSV_COLUMNS = keys
+    COL_SPACE = [len(col) for col in ["200000", "Validation"]+CSV_COLUMNS]
 
-    def __init__(self, preprocess_config, log_dir=None, result_dir=None):
+
+class Saver(BaseSaver):
+    def __init__(self, data_configs, model_config, log_dir, result_dir):
         super().__init__(log_dir, result_dir)
-        self.preprocess_config = preprocess_config
-        self.sr = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
+        self.data_configs = data_configs
+        self.model_config = model_config
+        self.sr = AUDIO_CONFIG["audio"]["sampling_rate"]
         
         self.val_loss_dicts = []
         self.log_loss_dicts = []
+
+        vocoder_cls = get_vocoder(self.model_config["vocoder"]["model"])
+        self.vocoder = vocoder_cls().cuda()
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         loss = outputs['losses']
@@ -31,20 +44,18 @@ class Saver(BaseSaver):
         _batch = outputs['_batch']
 
         step = pl_module.global_step + 1
-        if USE_COMET:
-            if isinstance(pl_module.logger, list):
-                assert len(list(pl_module.logger)) == 1
-                logger = pl_module.logger[0]
-            else:
-                logger = pl_module.logger
-        vocoder = pl_module.vocoder
+        if isinstance(pl_module.logger, list):
+            assert len(list(pl_module.logger)) == 1
+            logger = pl_module.logger[0]
+        else:
+            logger = pl_module.logger
 
         # Synthesis one sample and log to CometLogger
-        if USE_COMET:
+        if Define.USE_COMET:
             if step % pl_module.train_config["step"]["synth_step"] == 0 and pl_module.local_rank == 0:
                 metadata = {'ids': batch[0]}
                 fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
-                    _batch, output, vocoder, self.preprocess_config
+                    _batch, output, self.vocoder, self.model_config
                 )
                 self.log_figure(logger, "Training", step, basename, "", fig)
                 self.log_audio(logger, "Training", step, basename, "reconstructed", wav_reconstruction, self.sr, metadata)
@@ -53,7 +64,9 @@ class Saver(BaseSaver):
 
         # Log message to log.txt and print to stdout
         if step % trainer.log_every_n_steps == 0 and pl_module.local_rank == 0:
-            loss_dict = loss2dict(loss)
+            loss_dict = {k: v.item() for k, v in loss.items()}
+            set_format(list(loss_dict.keys()))
+            
             loss_dict.update({"Step": step, "Stage": "Training"})
             df = pd.DataFrame([loss_dict], columns=["Step", "Stage"]+CSV_COLUMNS)
             if len(self.log_loss_dicts)==0:
@@ -74,15 +87,14 @@ class Saver(BaseSaver):
         synth_output = outputs['synth']
         
         step = pl_module.global_step + 1
-        if USE_COMET:
-            if isinstance(pl_module.logger, list):
-                assert len(list(pl_module.logger)) == 1
-                logger = pl_module.logger[0]
-            else:
-                logger = pl_module.logger
-        vocoder = pl_module.vocoder
+        if isinstance(pl_module.logger, list):
+            assert len(list(pl_module.logger)) == 1
+            logger = pl_module.logger[0]
+        else:
+            logger = pl_module.logger
 
-        loss_dict = loss2dict(loss)
+        loss_dict = {k: v.item() for k, v in loss.items()}
+        set_format(list(loss_dict.keys()))
         self.val_loss_dicts.append(loss_dict)
 
         # Log loss for each sample to csv files
@@ -95,18 +107,18 @@ class Saver(BaseSaver):
 
         # Log figure/audio to logger + save audio
         # One smaple for the first two batches, so synthesize two samples in total.
-        if USE_COMET:
-            if batch_idx == 0 and pl_module.local_rank == 0:
-                metadata = {'ids': batch[0]}
-                fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
-                    _batch, output, vocoder, self.preprocess_config
-                )
+        if batch_idx == 0 and pl_module.local_rank == 0:
+            metadata = {'ids': batch[0]}
+            fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
+                _batch, output, self.vocoder, self.model_config
+            )
+            if Define.USE_COMET:
                 self.log_figure(logger, "Validation", step, basename, "", fig)
                 self.log_audio(logger, "Validation", step, basename, "reconstructed", wav_reconstruction, self.sr, metadata)
                 self.log_audio(logger, "Validation", step, basename, "synthesized", wav_prediction, self.sr, metadata)
                 plt.close(fig)
 
-                synth_samples(_batch, synth_output, vocoder, self.preprocess_config, figure_dir, audio_dir, f"FTstep_{step}")
+            synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
 
     def on_validation_epoch_end(self, trainer, pl_module):
         loss_dict = merge_dicts(self.val_loss_dicts)
@@ -134,11 +146,10 @@ class Saver(BaseSaver):
         synth_output = outputs["azure"]['synth']
         
         step = pl_module.global_step + 1
-        vocoder = pl_module.vocoder
 
         figure_dir = os.path.join(self.result_dir, "azure/figure")
         audio_dir = os.path.join(self.result_dir, "azure/audio")
         os.makedirs(figure_dir, exist_ok=True)
         os.makedirs(audio_dir, exist_ok=True)
 
-        synth_samples(_batch, synth_output, vocoder, self.preprocess_config, figure_dir, audio_dir, f"FTstep_{step}")
+        synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")

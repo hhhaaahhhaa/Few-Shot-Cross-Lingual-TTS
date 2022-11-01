@@ -123,15 +123,15 @@ class SSLUnitParser(BaseDataParser):
     def __init__(self, root):
         super().__init__(root)
 
-        self.dp_segment = Feature(
+        self.segment = Feature(
             NestSFQueryParser(f"{self.root}/segment"), JSONIO(), enable_cache=True)
         self.phoneme = Feature(
             NestSFQueryParser(f"{self.root}/phoneme"), TextIO(), enable_cache=True)
-        self.dp_duration = Feature(
+        self.duration = Feature(
             NestSFQueryParser(f"{self.root}/duration"), NumpyIO(), enable_cache=True)
-        self.dp_duration_avg_pitch = Feature(
+        self.duration_avg_pitch = Feature(
             NestSFQueryParser(f"{self.root}/duration_avg_pitch"), NumpyIO(), enable_cache=True)
-        self.dp_duration_avg_energy = Feature(
+        self.duration_avg_energy = Feature(
             NestSFQueryParser(f"{self.root}/duration_avg_energy"), NumpyIO(), enable_cache=True)
         self.alignment_matrix = Feature(
             NestSFQueryParser(f"{self.root}/alignment_matrix"), NumpyIO(), enable_cache=True)

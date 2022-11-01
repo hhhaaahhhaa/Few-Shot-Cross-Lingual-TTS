@@ -3,20 +3,25 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
+from lightning.build import build_id2symbols
 from lightning.collates import LanguageCollate, TextCollate
-from lightning.datasets.language import FastSpeech2Dataset, TextDataset, SSLUnitPseudoLabelDataset, SSLUnitFSCLDataset, NoisyFastSpeech2Dataset
+from lightning.datasets.language import FastSpeech2Dataset, TextDataset, UnitFSCLDataset, NoisyFastSpeech2Dataset
 from ..utils import EpisodicInfiniteWrapper
 
 
 class FastSpeech2DataModule(pl.LightningDataModule):
     """
-    Train: FastSpeech2Dataset + LanguageCollate.
-    Val: FastSpeech2Dataset + LanguageCollate.
+    Multilingual FastSpeech2 training, support training with units(not real phonemes) together.
+    Units can be unsupervised or pseudo labels.
+
+    Train: FastSpeech2Dataset/UnitFSCLDataset + LanguageCollate.
+    Val: FastSpeech2Dataset/UnitFSCLDataset + LanguageCollate.
     Test: TextDataset.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 
@@ -24,35 +29,44 @@ class FastSpeech2DataModule(pl.LightningDataModule):
         self.result_dir = result_dir
         self.val_step = self.train_config["step"]["val_step"]
 
-        self.re_id = True  # TODO: should be controlled by client directly
-        self.collate = LanguageCollate()
-        self.collate2 = TextCollate()
-
-        self.dataset_cls = dataset_cls
+        self.re_id = True
+        self.collate = LanguageCollate(data_configs)
+        self.collate2 = TextCollate(data_configs)
 
     def setup(self, stage=None):
-        spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
+        spk_refer_wav = (self.model_config["speaker_emb"]
                      in ["dvec", "encoder", "scratch_encoder"])
 
         if stage in (None, 'fit', 'validate'):
-            self.train_datasets = [
-                # self.dataset_cls(
-                FastSpeech2Dataset(
-                # NoisyFastSpeech2Dataset(
-                # SSLUnitPseudoLabelDataset(
-                # SSLUnitFSCLDataset(
-                    data_config['subsets']['train'],
-                    Define.DATAPARSERS[data_config["name"]],
-                    data_config, spk_refer_wav=spk_refer_wav
-                ) for data_config in self.data_configs if 'train' in data_config['subsets']
-            ]
-            self.val_datasets = [
-                FastSpeech2Dataset(
-                    data_config['subsets']['val'],
-                    Define.DATAPARSERS[data_config["name"]],
-                    data_config, spk_refer_wav=spk_refer_wav
-                ) for data_config in self.data_configs if 'val' in data_config['subsets']
-            ]
+            self.train_datasets, self.val_datasets = [], []
+            for data_config in self.data_configs:
+                if 'train' in data_config['subsets']:
+                    if "unit_name" in data_config:  # This is a unit instead of origin labels.
+                        dataset_cls = UnitFSCLDataset
+                    else:
+                        dataset_cls = FastSpeech2Dataset
+                    self.train_datasets.append(
+                        dataset_cls(
+                            data_config['subsets']['train'],
+                            Define.DATAPARSERS[data_config["name"]],
+                            data_config, spk_refer_wav=spk_refer_wav
+                        )
+                    )
+                
+                # For unsupervised units use UnitFSCLDataset, otherwise FastSpeech2Dataset
+                if 'val' in data_config['subsets']:
+                    if "n_symbols" in data_config:  # This is a unsupervised unit.
+                        dataset_cls = UnitFSCLDataset
+                    else:
+                        dataset_cls = FastSpeech2Dataset
+                    self.val_datasets.append(
+                        dataset_cls(
+                            data_config['subsets']['val'],
+                            Define.DATAPARSERS[data_config["name"]],
+                            data_config, spk_refer_wav=spk_refer_wav
+                        )
+                    )
+            
             self.train_dataset = ConcatDataset(self.train_datasets)
             self.val_dataset = ConcatDataset(self.val_datasets)
             self._train_setup()
@@ -117,11 +131,6 @@ class FastSpeech2DataModule(pl.LightningDataModule):
 
 
 class FastSpeech2TuneDataModule(FastSpeech2DataModule):
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
-        # super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FastSpeech2Dataset)
-
-        # SSL Units but mapped to phonemes (including identity map)
-        # super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitPseudoLabelDataset)
-        super().__init__(data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
-
+    def __init__(self, data_configs, train_config, model_config, algorithm_config, log_dir, result_dir):
+        super().__init__(data_configs, train_config, model_config, algorithm_config, log_dir, result_dir)
         self.re_id = False

@@ -28,9 +28,10 @@ energy:
     normalization: True
 
 multi_speaker: True
-multi_lingual: True
 
 max_seq_len: 1000
+
+speaker_emb: dvec
 
 vocoder:
   model: "MelGAN"

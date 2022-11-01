@@ -13,11 +13,11 @@ class System(pl.LightningModule):
     default_monitor: str = "val_loss"
 
     def __init__(
-        self, preprocess_config, model_config, train_config, algorithm_config,
+        self, data_configs, model_config, train_config, algorithm_config,
         log_dir, result_dir, ckpt_dir=None
     ):
         super().__init__()
-        self.preprocess_config = preprocess_config
+        self.data_configs = data_configs
         self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
@@ -27,10 +27,15 @@ class System(pl.LightningModule):
         self.result_dir = result_dir
         self.ckpt_dir = ckpt_dir
         
+        self.build_configs()
         self.build_model()
         if Define.DEBUG:
             print("Model structure:")
             print(self)
+
+    def build_configs(self):
+        """ Parser additional information """
+        pass
 
     def build_model(self):
         """ Build all components here. """
