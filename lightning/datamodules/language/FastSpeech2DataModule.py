@@ -41,7 +41,7 @@ class FastSpeech2DataModule(pl.LightningDataModule):
             self.train_datasets, self.val_datasets = [], []
             for data_config in self.data_configs:
                 if 'train' in data_config['subsets']:
-                    if "unit_name" in data_config:  # This is a unit instead of origin labels.
+                    if "unit_name" in data_config:  # This is a unit instead of origin language.
                         dataset_cls = UnitFSCLDataset
                     else:
                         dataset_cls = FastSpeech2Dataset
@@ -55,7 +55,7 @@ class FastSpeech2DataModule(pl.LightningDataModule):
                 
                 # For unsupervised units use UnitFSCLDataset, otherwise FastSpeech2Dataset
                 if 'val' in data_config['subsets']:
-                    if "n_symbols" in data_config:  # This is a unsupervised unit.
+                    if not data_config["use_real_phoneme"]:  # This is an unsupervised unit.
                         dataset_cls = UnitFSCLDataset
                     else:
                         dataset_cls = FastSpeech2Dataset

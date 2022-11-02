@@ -134,7 +134,7 @@ class SSLUnitFSCLDataset(Dataset):
             "basename": basename,
         }
 
-        segment = self.unit_parser.dp_segment.read_from_query(query)
+        segment = self.unit_parser.segment.read_from_query(query)
         avg_frames = segment2duration(segment, fp=0.02)
         phonemes = self.unit_parser.phoneme.read_from_query(query)
         raw_text = self.data_parser.text.read_from_query(query)

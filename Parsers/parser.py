@@ -12,16 +12,16 @@ from dlhlp_lib.parsers.IOObjects import NumpyIO, PickleIO, WavIO, TextGridIO, Te
 #     def __init__(self, root):
 #         super().__init__(root)
 
-#         self.dp_segment = Feature(
-#             SFQueryParser(f"{self.root}/dp_segment"), PickleIO(), enable_cache=True)
+#         self.segment = Feature(
+#             SFQueryParser(f"{self.root}/segment"), PickleIO(), enable_cache=True)
 #         self.phoneme = Feature(
 #             SFQueryParser(f"{self.root}/phoneme"), TextIO(), enable_cache=True)
-#         self.dp_duration = Feature(
-#             SFQueryParser(f"{self.root}/dp_duration"), NumpyIO(), enable_cache=True)
-#         self.dp_duration_avg_pitch = Feature(
-#             SFQueryParser(f"{self.root}/dp_duration_avg_pitch"), NumpyIO(), enable_cache=True)
-#         self.dp_duration_avg_energy = Feature(
-#             SFQueryParser(f"{self.root}/dp_duration_avg_energy"), NumpyIO(), enable_cache=True)
+#         self.duration = Feature(
+#             SFQueryParser(f"{self.root}/duration"), NumpyIO(), enable_cache=True)
+#         self.duration_avg_pitch = Feature(
+#             SFQueryParser(f"{self.root}/duration_avg_pitch"), NumpyIO(), enable_cache=True)
+#         self.duration_avg_energy = Feature(
+#             SFQueryParser(f"{self.root}/duration_avg_energy"), NumpyIO(), enable_cache=True)
 #         self.alignment_matrix = Feature(
 #             NestSFQueryParser(f"{self.root}/alignment_matrix"), NumpyIO(), enable_cache=True)
 #         self.lp_matrix = Feature(

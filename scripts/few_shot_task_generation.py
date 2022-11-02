@@ -128,14 +128,14 @@ if __name__ == "__main__":
         n_tasks=20
     )
 
-    # generator = TaskGenerator("JSUT", "preprocessed_data/JSUT", lang_id="jp")
-    # generator.generate(
-    #     src_txt_path="_data/JSUT/val.txt",
-    #     output_dir="_data/JSUT/few-shot",
-    #     shots=[4, 8, 16, 32, 64, 128],
-    #     n_qry=64,
-    #     n_tasks=20
-    # )
+    generator = TaskGenerator("JSUT", "preprocessed_data/JSUT", lang_id="jp")
+    generator.generate(
+        src_txt_path="_data/JSUT/val.txt",
+        output_dir="_data/JSUT/few-shot",
+        shots=[4, 8, 16, 32, 64, 128],
+        n_qry=64,
+        n_tasks=20
+    )
 
     generator = TaskGenerator("CSS10-german", "preprocessed_data/CSS10/german", lang_id="de")
     generator.generate(

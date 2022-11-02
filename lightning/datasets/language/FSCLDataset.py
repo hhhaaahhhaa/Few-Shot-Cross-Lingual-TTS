@@ -248,7 +248,7 @@ class UnitFSCLDataset(Dataset):
         self.symbol_id = config["symbol_id"]
         self.cleaners = config["text_cleaners"]
         self.id2symbols = build_id2symbols([config])
-        self.use_real_phonemes = config["lang_id"] == config["symbol_id"]
+        self.use_real_phoneme = config["use_real_phoneme"]
 
         self.unit_parser = self.data_parser.ssl_units[self.unit_name]
         # try:
@@ -265,9 +265,6 @@ class UnitFSCLDataset(Dataset):
         #     self.cleaners = config["text_cleaners"]
 
         self.basename, self.speaker = self.process_meta(filename)
-        with open(self.data_parser.speakers_path, 'r', encoding='utf-8') as f:
-            self.speakers = json.load(f)
-            self.speaker_map = {spk: i for i, spk in enumerate(self.speakers)}
 
     def __len__(self):
         return len(self.basename)
@@ -275,7 +272,6 @@ class UnitFSCLDataset(Dataset):
     def __getitem__(self, idx):
         basename = self.basename[idx]
         speaker = self.speaker[idx]
-        speaker_id = self.speaker_map[speaker]
         query = {
             "spk": speaker,
             "basename": basename,
@@ -295,7 +291,6 @@ class UnitFSCLDataset(Dataset):
             energy = self.data_parser.energy.read_from_query(query)
             energy = energy[:sum(duration)]
         phonemes = self.unit_parser.phoneme.read_from_query(query)
-        phonemes = f"{{{phonemes}}}"
         raw_text = self.data_parser.text.read_from_query(query)
 
         _, _, global_pitch_mu, global_pitch_std, _, _, global_energy_mu, global_energy_std = Define.ALLSTATS["global"]
@@ -303,7 +298,7 @@ class UnitFSCLDataset(Dataset):
             pitch = (pitch - global_pitch_mu) / global_pitch_std
         if self.config["energy"]["normalization"]:
             energy = (energy - global_energy_mu) / global_energy_std
-        if self.use_real_phonemes:
+        if self.use_real_phoneme:
             phonemes = f"{{{phonemes}}}"
             text = np.array(text_to_sequence(phonemes, self.cleaners, self.lang_id))
         else:
@@ -331,7 +326,7 @@ class UnitFSCLDataset(Dataset):
 
         sample = {
             "id": basename,
-            "speaker": speaker_id,
+            "speaker": speaker,
             "text": text,
             "raw_text": raw_text,
             "mel": mel,
@@ -347,10 +342,10 @@ class UnitFSCLDataset(Dataset):
             sample.update({"spk_ref_mel_slices": spk_ref_mel_slices})
 
         # For codebook module
-        segment = self.unit_parser.dp_segment.read_from_query(query)
+        segment = self.unit_parser.segment.read_from_query(query)
         if Define.UPSTREAM == "mel":
             raw_feat = mel
-            avg_frames = self.unit_parser.dp_duration.read_from_query(query)
+            avg_frames = self.unit_parser.duration.read_from_query(query)
         else:
             raw_feat = self.data_parser.wav_trim_16000.read_from_query(query)
             avg_frames = segment2duration(segment, fp=0.02)
