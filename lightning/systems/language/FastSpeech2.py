@@ -1,3 +1,4 @@
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -106,3 +107,29 @@ class BaselineSystem(System):
     # def generate_azure_wavs(self, batch, batch_idx):
     #     synth_predictions = self.text_synth_step(batch, batch_idx)
     #     return {'_batch': batch, 'synth': synth_predictions}
+
+    def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray):
+        """
+        Return FastSpeech2 results:
+            (
+                output,
+                postnet_output,
+                p_predictions,
+                e_predictions,
+                log_d_predictions,
+                d_rounded,
+                src_masks,
+                mel_masks,
+                src_lens,
+                mel_lens,
+            )
+        """
+        spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
+        texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
+        emb_texts = self.embedding_model(texts)
+        src_lens = torch.LongTensor([len(text)]).to(self.device)
+        max_src_len = max(src_lens)
+
+        output = self.model(spk_args, emb_texts, src_lens, max_src_len, average_spk_emb=True)
+
+        return output

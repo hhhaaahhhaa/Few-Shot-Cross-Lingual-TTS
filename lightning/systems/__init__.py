@@ -1,3 +1,6 @@
+from typing import Type
+
+from . system import System
 from . import language
 from . import phoneme_recognition
 
@@ -21,5 +24,5 @@ SYSTEM = {
     "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
 }
 
-def get_system(algorithm):
+def get_system(algorithm) -> Type[System]:
     return SYSTEM[algorithm]
