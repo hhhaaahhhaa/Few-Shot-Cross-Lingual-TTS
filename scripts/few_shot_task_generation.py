@@ -9,7 +9,7 @@ from typing import List, Dict
 from tqdm import tqdm
 import yaml
 
-from lightning.utils.tool import read_queries_from_txt, write_queries_to_txt
+from Parsers.utils import read_queries_from_txt, write_queries_to_txt
 from Parsers.parser import DataParser
 
 

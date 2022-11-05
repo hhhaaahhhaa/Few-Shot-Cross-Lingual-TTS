@@ -1,6 +1,4 @@
 import warnings
-
-from lightning.utils.tool import write_queries_to_txt
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import librosa
 import json
@@ -10,7 +8,8 @@ from dlhlp_lib.audio import AUDIO_CONFIG
 from dlhlp_lib.tts_preprocess.basic import *
 
 import Define
-from Parsers.parser import DataParser
+from .parser import DataParser
+from .utils import write_queries_to_txt
 
 
 INV_FRAME_PERIOD = AUDIO_CONFIG["audio"]["sampling_rate"] / AUDIO_CONFIG["stft"]["hop_length"]

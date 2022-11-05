@@ -137,8 +137,11 @@ def synth_samples(targets, predictions, vocoder: BaseVocoder, model_config, figu
 
     mel_predictions = predictions[1].transpose(1, 2)
     lengths = predictions[9] * AUDIO_CONFIG["stft"]["hop_length"]
-    wav_predictions = vocoder.infer(mel_predictions, lengths=lengths)
+    try:
+        wav_predictions = vocoder.infer(mel_predictions, lengths=lengths)
 
-    sampling_rate = AUDIO_CONFIG["audio"]["sampling_rate"]
-    for wav, basename in zip(wav_predictions, targets[0]):
-        wavfile.write(os.path.join(audio_dir, f"{basename}.{name}.synth.wav"), sampling_rate, wav)
+        sampling_rate = AUDIO_CONFIG["audio"]["sampling_rate"]
+        for wav, basename in zip(wav_predictions, targets[0]):
+            wavfile.write(os.path.join(audio_dir, f"{basename}.{name}.synth.wav"), sampling_rate, wav)
+    except:
+        print("Vocoder fails, if happened in early training stage, might due to very very short mel spectrograms.")

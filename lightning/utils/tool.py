@@ -182,6 +182,7 @@ def pad(input_ele, mel_max_length=None):
 
 
 def read_queries_from_txt(path):
+    print("Deprecated, moved to Parsers/ to avoid circular import.")
     res = []
     with open(path, "r", encoding="utf-8") as f:
         for line in f.readlines():
@@ -196,6 +197,7 @@ def read_queries_from_txt(path):
 
 
 def write_queries_to_txt(data_parser, queries, path):
+    print("Deprecated, moved to Parsers/ to avoid circular import.")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data_parser.phoneme.read_all()
     data_parser.text.read_all()

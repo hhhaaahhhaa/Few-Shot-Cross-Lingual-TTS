@@ -15,7 +15,7 @@ from dlhlp_lib.utils.tool import segment2duration
 import Define
 from text.define import LANG_ID2SYMBOLS
 from lightning.systems import get_system
-from lightning.utils.tool import read_queries_from_txt
+from Parsers.utils import read_queries_from_txt
 from lightning.model.reduction import PhonemeQueryExtractor
 from Parsers.parser import DataParser
 from Objects.config import LanguageDataConfigReader
