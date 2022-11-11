@@ -8,11 +8,11 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from dlhlp_lib.audio import AUDIO_CONFIG
+from dlhlp_lib.utils.tool import get_mask_from_lengths
 
 from transformer import Decoder, PostNet, Encoder2
 from .modules import VarianceAdaptor
 from .speaker_encoder import SpeakerEncoder, LanguageEncoder
-from lightning.utils.tool import get_mask_from_lengths
 
 
 class FastSpeech2(pl.LightningModule):
@@ -61,9 +61,9 @@ class FastSpeech2(pl.LightningModule):
         d_control=1.0,
         average_spk_emb=False,
     ):
-        src_masks = get_mask_from_lengths(src_lens, max_src_len)
+        src_masks = get_mask_from_lengths(src_lens, max_src_len).to(self.device)
         mel_masks = (
-            get_mask_from_lengths(mel_lens, max_mel_len)
+            get_mask_from_lengths(mel_lens, max_mel_len).to(self.device)
             if mel_lens is not None
             else None
         )

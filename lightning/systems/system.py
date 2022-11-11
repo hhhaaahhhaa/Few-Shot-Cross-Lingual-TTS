@@ -32,6 +32,8 @@ class System(pl.LightningModule):
         if Define.DEBUG:
             print("Model structure:")
             print(self)
+            pytorch_total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+            print("Total trainable params: ", pytorch_total_params)
 
     def build_configs(self):
         """ Parser additional information """

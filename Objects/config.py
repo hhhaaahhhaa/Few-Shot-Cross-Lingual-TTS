@@ -18,4 +18,14 @@ class LanguageDataConfigReader(object):
             else:
                 config["symbol_id"] = config["lang_id"]
                 config["use_real_phoneme"] = True
+        
+        if "target" in config:
+            target = config["target"]
+            if "n_symbols" in target:
+                target["symbol_id"] = target["unit_name"]
+                target["use_real_phoneme"] = False
+            else:
+                target["symbol_id"] = target["lang_id"]
+                target["use_real_phoneme"] = True
+        
         return config

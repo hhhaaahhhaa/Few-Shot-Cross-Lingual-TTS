@@ -3,6 +3,7 @@ from typing import Type
 from . system import System
 from . import language
 from . import phoneme_recognition
+from . import t2u
 
 
 SYSTEM = {
@@ -22,6 +23,8 @@ SYSTEM = {
     # "pr-fscl": phoneme_recognition.TransHeadSystem,
     # "pr-fscl-tune": phoneme_recognition.TransHeadTuneSystem,
     "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
+
+    "tacot2u": t2u.TacoT2USystem,
 }
 
 def get_system(algorithm) -> Type[System]:

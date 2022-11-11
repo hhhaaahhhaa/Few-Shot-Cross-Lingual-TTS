@@ -73,7 +73,7 @@ class Saver(Callback):
 
             # log asr results
             sentence = _batch[3][0]
-            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), lang_id=lang_id)
+            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), symbol_id=lang_id)
             
             self.log_text(logger, "Train/GT: " + ", ".join(gt_sentence), step)
             self.log_text(logger, "Train/Pred: " + ", ".join(pred_sentence), step)
@@ -108,7 +108,7 @@ class Saver(Callback):
 
             # log asr results
             sentence = _batch[3][0]
-            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), lang_id=lang_id)
+            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), symbol_id=lang_id)
             
             self.log_text(logger, "Val/GT: " + ", ".join(gt_sentence), step)
             self.log_text(logger, "Val/Pred: " + ", ".join(pred_sentence), step)

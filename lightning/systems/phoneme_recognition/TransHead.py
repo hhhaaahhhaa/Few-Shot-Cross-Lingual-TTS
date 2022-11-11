@@ -86,7 +86,7 @@ class TransHeadSystem(AdaptorSystem):
 
         # TransHead          
         output = F.linear(x, head_weights, bias=self.trans_head_bias)
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
 
         return loss, 
         
@@ -112,7 +112,7 @@ class TransHeadSystem(AdaptorSystem):
 
         # TransHead          
         output = F.linear(x, head_weights, bias=self.trans_head_bias)
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
 
         return loss, output
 

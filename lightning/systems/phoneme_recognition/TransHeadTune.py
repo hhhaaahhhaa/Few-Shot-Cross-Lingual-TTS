@@ -94,7 +94,7 @@ class TransHeadTuneSystem(System):
         x = self.downstream(ssl_repr, labels[4].cpu())
        
         output = self.head(x)
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
 
         return loss, output
 

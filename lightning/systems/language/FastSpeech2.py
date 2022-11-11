@@ -108,7 +108,7 @@ class BaselineSystem(System):
     #     synth_predictions = self.text_synth_step(batch, batch_idx)
     #     return {'_batch': batch, 'synth': synth_predictions}
 
-    def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray):
+    def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray, symbol_id: str):
         """
         Return FastSpeech2 results:
             (
@@ -126,10 +126,11 @@ class BaselineSystem(System):
         """
         spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
         texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
-        emb_texts = self.embedding_model(texts)
+        emb_texts = self.embedding_model(texts, symbol_id)
         src_lens = torch.LongTensor([len(text)]).to(self.device)
         max_src_len = max(src_lens)
-
-        output = self.model(spk_args, emb_texts, src_lens, max_src_len, average_spk_emb=True)
+        
+        with torch.no_grad():
+            output = self.model(spk_args, emb_texts, src_lens, max_src_len, average_spk_emb=True)
 
         return output

@@ -1,5 +1,6 @@
 from . import language
 from . import phoneme_recognition
+from . import t2u
 
 
 DATA_MODULE = {
@@ -19,6 +20,8 @@ DATA_MODULE = {
     # "pr-fscl": phoneme_recognition.FSCLDataModule,
     # "pr-fscl-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-protonet": phoneme_recognition.FSCLDataModule,
+
+    "tacot2u": t2u.T2UDataModule,
 }
 
 def get_datamodule(algorithm):

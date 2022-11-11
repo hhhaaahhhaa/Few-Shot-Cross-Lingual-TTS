@@ -15,7 +15,7 @@ class PRFramewiseLoss(nn.Module):
 
     def forward(self, labels, preds):
         preds = preds.transpose(1, 2)  # B, N, L
-        target = labels[3]  # B, L
+        target = labels  # B, L
         return self.loss(preds, target)
 
 

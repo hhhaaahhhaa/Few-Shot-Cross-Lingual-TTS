@@ -65,7 +65,7 @@ class SSLCodebookClusterSystem(System):
         x, _ = self.codebook(x)
        
         output = self.head(x, lang_id=repr_info["lang_id"])
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
         ortho_loss = self.ortho_loss()
         loss_dict = {
             "Total Loss": loss + ortho_loss,

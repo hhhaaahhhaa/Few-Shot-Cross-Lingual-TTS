@@ -9,7 +9,9 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 
-from lightning.utils.tool import get_mask_from_lengths, pad
+from dlhlp_lib.utils.tool import get_mask_from_lengths
+
+from lightning.utils.tool import pad
 import Define
 
 
@@ -132,7 +134,7 @@ class VarianceAdaptor(nn.Module):
                 min=0,
             )
             x, mel_len = self.length_regulator(x, duration_rounded, max_len)
-            mel_mask = get_mask_from_lengths(mel_len)
+            mel_mask = get_mask_from_lengths(mel_len).to(x.device)
 
         if self.pitch_feature_level == "frame_level":
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(

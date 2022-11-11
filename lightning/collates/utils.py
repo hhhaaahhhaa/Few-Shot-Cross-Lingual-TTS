@@ -14,7 +14,7 @@ def reprocess(data, idxs, mode="sup"):
     """
     ids = [data[idx]["id"] for idx in idxs]
     speakers = [data[idx]["speaker"] for idx in idxs]
-    lang_ids = [LANG_NAME2ID[data[idx]["lang_id"]] for idx in idxs]
+    lang_ids = [data[idx]["lang_id"] for idx in idxs]
     speakers = np.array(speakers)
     lang_ids = np.array(lang_ids)
 

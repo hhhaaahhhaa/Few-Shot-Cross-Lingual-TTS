@@ -4,6 +4,7 @@ Global setup from data_configs.
 from torchaudio.models.decoder import ctc_decoder
 
 from text.define import LANG_ID2SYMBOLS
+from text.symbols import common_symbols
 import Define
 from Parsers.parser import DataParser
 
@@ -16,7 +17,14 @@ def build_id2symbols(data_configs):
             if data_config["symbol_id"] in LANG_ID2SYMBOLS:
                 id2symbols[data_config["symbol_id"]] = LANG_ID2SYMBOLS[data_config["symbol_id"]]
             else:  # units which are not pseudo labels
-                id2symbols[data_config["symbol_id"]] = [str(idx) for idx in range(data_config["n_symbols"])]
+                id2symbols[data_config["symbol_id"]] = common_symbols + [str(idx) for idx in range(data_config["n_symbols"])]
+        
+        if "target" in data_config:
+            target = data_config["target"]
+            if target["symbol_id"] in LANG_ID2SYMBOLS:
+                id2symbols[target["symbol_id"]] = LANG_ID2SYMBOLS[target["symbol_id"]]
+            else:  # units which are not pseudo labels
+                id2symbols[target["symbol_id"]] = common_symbols + [str(idx) for idx in range(target["n_symbols"])]
 
     return id2symbols
 

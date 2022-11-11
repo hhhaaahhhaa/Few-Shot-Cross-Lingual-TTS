@@ -96,12 +96,12 @@ class SSLProtoNetSystem(AdaptorSystem):
         # Prototype loss
         output = -torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
         if self.use_ctc:
-            loss = self.loss_func(labels, output)
+            loss = self.loss_func(labels[3], output)
         #     log_probs = torch.log_softmax(output, dim=2)
         #     with torch.backends.cudnn.flags(deterministic=True):  # for reproducibility
         #         loss = self.loss_func(log_probs.transpose(0, 1), labels[6], labels[4].cpu(), labels[7].cpu())
         else:
-            loss = self.loss_func(labels, output)
+            loss = self.loss_func(labels[3], output)
 
         if self.support_head:
             output_support = self.head(x, lang_id=repr_info["lang_id"])

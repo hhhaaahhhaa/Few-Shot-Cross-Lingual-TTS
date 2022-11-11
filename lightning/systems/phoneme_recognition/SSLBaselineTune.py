@@ -65,7 +65,7 @@ class SSLBaselineTuneSystem(System):
         x = self.downstream(ssl_repr, labels[4].cpu())
        
         output = self.head(x, lang_id=repr_info["lang_id"])
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
         loss_dict = {
             "Total Loss": loss,
         }

@@ -91,8 +91,8 @@ def main(args, configs):
     ckpt_file = None
     if args.exp_key is not None:
         ckpt_file = os.path.join(
-            train_config["path"]["ckpt_path"], COMET_CONFIG["project_name"],
-            args.exp_key, 'checkpoints', args.ckpt_file
+            train_config["path"]["ckpt_path"], # COMET_CONFIG["project_name"],
+            args.exp_key, args.ckpt_file
         )
 
     pretrain_ckpt_file = None
