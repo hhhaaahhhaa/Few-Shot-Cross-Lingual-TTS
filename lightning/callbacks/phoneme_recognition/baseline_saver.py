@@ -33,6 +33,11 @@ class Saver(Callback):
         super().__init__()
         self.data_configs = data_configs
         self.id2symbols = build_id2symbols(self.data_configs)
+        increment = 0
+        self.re_id_increment = {}
+        for k, v in self.id2symbols.items():
+            self.re_id_increment[k] = increment
+            increment += len(v)
 
         self.log_dir = log_dir
         self.result_dir = result_dir
@@ -156,6 +161,8 @@ class Saver(Callback):
         for (gt_id, pred_id) in zip(gt_ids, pred_ids):
             if gt_id == 0:
                 break
+            gt_id = int(gt_id) - self.re_id_increment[symbol_id]
+            pred_id = int(pred_id) - self.re_id_increment[symbol_id]
             gt_sentence.append(self.id2symbols[symbol_id][gt_id])
             pred_sentence.append(self.id2symbols[symbol_id][pred_id])
 

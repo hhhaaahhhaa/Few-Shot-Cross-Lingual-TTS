@@ -98,7 +98,7 @@ def main(args, configs):
     pretrain_ckpt_file = None
     if args.pretrain_path is not None:
         pretrain_ckpt_file = os.path.join(
-            args.pretrain_path, 'checkpoints', args.ckpt_file
+            args.pretrain_path, args.ckpt_file
         )
 
     trainer_training_config = {

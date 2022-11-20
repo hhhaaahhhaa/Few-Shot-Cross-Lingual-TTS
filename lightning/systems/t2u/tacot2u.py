@@ -99,6 +99,29 @@ class TacoT2USystem(System):
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, 
                 '_batch': batch, 'symbol_id': batch[10][0], 'alignment': alignment}
 
+    def teacher_inference(self, text, text_gt, symbol_id):
+        """
+        Return TacoT2U results:
+            (
+                output,
+                alignment,
+            )
+        """
+        # Match input format for model.forward
+        texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
+        emb_texts = self.embedding_model(texts, symbol_id)
+        units = torch.from_numpy(text_gt).long().unsqueeze(0).to(self.device)
+        text_lengths = torch.LongTensor([texts.shape[1]]).to(self.device)
+        max_len = torch.max(text_lengths)
+        output_lengths = torch.LongTensor([units.shape[1]]).to(self.device)
+
+        inputs = (emb_texts, text_lengths, units, max_len, output_lengths, None, None)        
+        with torch.no_grad():
+            self.model.decoder.teacher_forcing_ratio = 1.0
+            output = self.model(inputs)
+
+        return output
+
     def inference(self, text, symbol_id):
         """
         Return TacoT2U results:
@@ -117,6 +140,7 @@ class TacoT2USystem(System):
 
 
 def schedule_f(step: int) -> float:
-    return max(0.5, 1 - step / 20000)
+    return 1.0
+    # return max(0.5, 1 - step / 20000)
     # else:
     #     return max(0, 0.5 - (step - 20000) / 20000)

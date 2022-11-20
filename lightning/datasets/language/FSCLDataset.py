@@ -251,18 +251,8 @@ class UnitFSCLDataset(Dataset):
         self.use_real_phoneme = config["use_real_phoneme"]
 
         self.unit_parser = self.data_parser.ssl_units[self.unit_name]
-        # try:
-        #     with open(f"{self.unit_parser.root}/centroids.pkl", "rb") as f:
-        #         kmeans_model = pickle.load(f)
-        #         self.n_clusters = kmeans_model.cluster_centers_.shape[0]
-        # except:
-        #     self.n_clusters = 0
-        
-        # if self.map2phoneme:
-        #     with open(f"{self.unit_parser.root}/centroids2phoneme.pkl", "rb") as f:
-        #         pairs = pickle.load(f)
-        #     self.unit2phoneme = {idx: phn for (idx, phn) in pairs}
-        #     self.cleaners = config["text_cleaners"]
+        if not self.use_real_phoneme:
+            self.unit2id = {p: i for i, p in enumerate(self.id2symbols[self.symbol_id])}
 
         self.basename, self.speaker = self.process_meta(filename)
 
@@ -302,7 +292,7 @@ class UnitFSCLDataset(Dataset):
             phonemes = f"{{{phonemes}}}"
             text = np.array(text_to_sequence(phonemes, self.cleaners, self.lang_id))
         else:
-            text = np.array([int(phn) for phn in phonemes.split(" ")])
+            text = np.array([self.unit2id[phn] for phn in phonemes.split(" ")])
         
         # Sanity check
         assert not numpy_exist_nan(mel)

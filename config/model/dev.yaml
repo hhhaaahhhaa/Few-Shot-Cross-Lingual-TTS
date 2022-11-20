@@ -33,5 +33,5 @@ multi_lingual: True
 max_seq_len: 1000
 
 vocoder:
-  model: "MelGAN"
+  model: "HifiGAN"
   speaker: "universal" # support  'LJSpeech', 'universal'
