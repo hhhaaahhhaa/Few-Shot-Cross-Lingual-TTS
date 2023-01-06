@@ -3,7 +3,8 @@ import torch
 from functools import partial
 from collections import defaultdict
 
-from text.define import LANG_ID2SYMBOLS
+from text.define import LANG_NAME2ID
+from lightning.build import build_all_speakers, build_id2symbols
 from .utils import reprocess
 
 
@@ -17,14 +18,19 @@ class FSCLCollate(object):
     data: len(data) = K + Q     [SGD, K%B=0]
     """
 
-    def __init__(self):
+    def __init__(self, data_configs):
         # calculate re-id increment
+        id2symbols = build_id2symbols(data_configs)
         increment = 0
         self.re_id_increment = {}
-        for k, v in LANG_ID2SYMBOLS.items():
+        for k, v in id2symbols.items():
             self.re_id_increment[k] = increment
             increment += len(v)
         self.n_symbols = increment
+
+        # calculate speaker map
+        speakers = build_all_speakers(data_configs)
+        self.speaker_map = {spk: i for i, spk in enumerate(speakers)}
 
     def collate_fn(self, shots, queries, re_id=False):
         return partial(self._collate_fn, shots=shots, queries=queries, re_id=re_id)
@@ -39,9 +45,16 @@ class FSCLCollate(object):
         assert data_size == batch_size, "len(data) = K + Q     [SGD, K%B=0]"
 
         idx_arr = np.arange(data_size)
+        
+        # concat embedding, re-id each phoneme
         if re_id:
             for idx in idx_arr:
-                data[idx]["text"] += self.re_id_increment[data[idx]["lang_id"]]
+                data[idx]["text"] += self.re_id_increment[data[idx]["symbol_id"]]
+        
+        # remap speakers and language
+        for idx in idx_arr:
+            data[idx]["speaker"] = self.speaker_map[data[idx]["speaker"]]
+            data[idx]["lang_id"] = LANG_NAME2ID[data[idx]["lang_id"]]
         
         idx_arr = idx_arr.reshape((-1, batch_size))
 
@@ -111,8 +124,10 @@ class GeneralFSCLCollate(object):
     Provide raw features and segments for speech representation extraction.
     This is a general version of FSCLCollate (without split).
     """
-    def __init__(self):
-        pass
+    def __init__(self, data_configs):
+        # calculate speaker map
+        speakers = build_all_speakers(data_configs)
+        self.speaker_map = {spk: i for i, spk in enumerate(speakers)}
 
     def collate_fn(self, sort=False, mode="sup"):
         return partial(self._collate_fn, sort=sort, mode=mode)
@@ -125,6 +140,12 @@ class GeneralFSCLCollate(object):
             idx_arr = np.argsort(-len_arr)
         else:
             idx_arr = np.arange(data_size)
+
+        # remap speakers and language
+        for idx in idx_arr:
+            data[idx]["speaker"] = self.speaker_map[data[idx]["speaker"]]
+            data[idx]["lang_id"] = LANG_NAME2ID[data[idx]["lang_id"]]
+        
         output = reprocess(data, idx_arr, mode=mode)
 
         repr_info = {}
@@ -133,7 +154,10 @@ class GeneralFSCLCollate(object):
             repr_info["n_symbols"] = data[0]["n_symbols"]
             repr_info["lang_id"] = lang_id
             repr_info["texts"] = [data[idx]["text"] for idx in idx_arr]
+        elif mode == "unsup":
+            repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
+            repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
+        else:
+            raise NotImplementedError
 
-        repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
-        repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
         return (output, repr_info)

@@ -97,6 +97,7 @@ def reprocess(data, idxs, mode="sup"):
             torch.from_numpy(pitches).float(),
             torch.from_numpy(energies),
             torch.from_numpy(durations).long(),
+            torch.from_numpy(lang_ids).long(),
         )
     elif mode == "inference":
         return (

@@ -139,6 +139,7 @@ class SSLUnitParser(BaseDataParser):
             NestSFQueryParser(f"{self.root}/label_propagation"), NumpyIO(), enable_cache=True)
     
     def _init_structure(self):
+        return
         os.makedirs(self.root, exist_ok=True)
 
     def get_feature(self, query: str) -> Feature:

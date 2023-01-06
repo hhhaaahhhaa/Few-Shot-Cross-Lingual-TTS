@@ -30,7 +30,7 @@ energy:
 multi_speaker: True
 multi_lingual: True
 
-max_seq_len: 1000
+max_seq_len: 1500
 
 speaker_emb: dvec
 

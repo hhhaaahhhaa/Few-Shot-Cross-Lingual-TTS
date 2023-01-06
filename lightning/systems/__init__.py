@@ -25,6 +25,8 @@ SYSTEM = {
     "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
 
     "tacot2u": t2u.TacoT2USystem,
+
+    "conti-ae": language.ContiAESystem,
 }
 
 def get_system(algorithm) -> Type[System]:

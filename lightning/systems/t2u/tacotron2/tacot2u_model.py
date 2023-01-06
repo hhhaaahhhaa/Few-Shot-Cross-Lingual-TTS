@@ -348,7 +348,7 @@ class Decoder(nn.Module):
             prediction = torch.argmax(hidden_output.squeeze(1), dim=1)
 
             if prediction[0].item() == 8:
-                print('Terminated by <eos>.')
+                # print('Terminated by <eos>.')
                 break
             elif len(hidden_outputs) / alignment.shape[1] >= hps.max_decoder_ratio:
                 print('Warning: Reached max decoder steps.')

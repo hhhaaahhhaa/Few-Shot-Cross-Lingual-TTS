@@ -22,6 +22,8 @@ DATA_MODULE = {
     "pr-ssl-protonet": phoneme_recognition.FSCLDataModule,
 
     "tacot2u": t2u.T2UDataModule,
+
+    "conti-ae": language.ContiAEDataModule,
 }
 
 def get_datamodule(algorithm):
