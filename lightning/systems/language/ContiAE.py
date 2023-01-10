@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
+from text.define import LANG_NAME2ID
 from lightning.build import build_all_speakers
 from lightning.systems.system import System
 from lightning.model import FastSpeech2Loss, FastSpeech2
@@ -99,8 +100,7 @@ class ContiAESystem(System):
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch[0], 'synth': synth_predictions}
 
-    # TODO:
-    def inference(self, spk_ref_mel_slice: np.ndarray, wav: np.ndarray, symbol_id: str):
+    def inference(self, spk_ref_mel_slice: np.ndarray, wav: np.ndarray, lang_id: str):
         """
         Return FastSpeech2 results:
             (
@@ -116,13 +116,18 @@ class ContiAESystem(System):
                 mel_lens,
             )
         """
-        # spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
-        # texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
-        # emb_texts = self.embedding_model(texts, symbol_id)
-        # src_lens = torch.LongTensor([len(text)]).to(self.device)
-        # max_src_len = max(src_lens)
-        
-        # with torch.no_grad():
-        #     output = self.model(spk_args, emb_texts, src_lens, max_src_len, average_spk_emb=True)
+        spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
+        lang_args = torch.LongTensor([LANG_NAME2ID[lang_id]]).to(self.device)
+        mel_len = int(len(wav) / 16000 * 22050 / 256)
+        src_lens = torch.LongTensor([mel_len]).to(self.device)
+        max_src_len = max(src_lens)
+       
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract([wav])  # B, L, n_layers, dim
+            ssl_repr = ssl_repr[:, :, 24, :]  # TODO: Define.layer_idx is not saved with model checkpoint...
+            ssl_repr = F.interpolate(ssl_repr.transpose(1, 2), size=mel_len).transpose(1, 2).detach()  # Interpolate
 
-        return None
+        emb_texts = self.embedding_model(ssl_repr)
+        output = self.model(spk_args, emb_texts, src_lens, max_src_len, lang_args=lang_args, average_spk_emb=True)
+
+        return output

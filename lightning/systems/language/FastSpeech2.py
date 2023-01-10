@@ -2,6 +2,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
+from text.define import LANG_NAME2ID
 from lightning.build import build_all_speakers, build_id2symbols
 from lightning.systems.system import System
 from lightning.model import FastSpeech2Loss, FastSpeech2
@@ -51,7 +52,7 @@ class BaselineSystem(System):
 
     def common_step(self, batch, batch_idx, train=True):
         emb_texts = self.embedding_model(batch[3])
-        output = self.model(batch[2], emb_texts, *(batch[4:-1]))
+        output = self.model(batch[2], emb_texts, *(batch[4:]))
         loss = self.loss_func(batch[:-1], output)
         loss_dict = {
             "Total Loss"       : loss[0],
@@ -65,7 +66,7 @@ class BaselineSystem(System):
     
     def synth_step(self, batch, batch_idx):
         emb_texts = self.embedding_model(batch[3])
-        output = self.model(batch[2], emb_texts, *(batch[4:6]), average_spk_emb=True)
+        output = self.model(batch[2], emb_texts, *(batch[4:6]), lang_args=batch[-1], average_spk_emb=True)
         return output
 
     # def text_synth_step(self, batch, batch_idx):  # only used when inference (use TextDataset2)
@@ -108,7 +109,7 @@ class BaselineSystem(System):
     #     synth_predictions = self.text_synth_step(batch, batch_idx)
     #     return {'_batch': batch, 'synth': synth_predictions}
 
-    def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray, symbol_id: str):
+    def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray, symbol_id: str, lang_id: str=None):
         """
         Return FastSpeech2 results:
             (
@@ -125,12 +126,16 @@ class BaselineSystem(System):
             )
         """
         spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
+        if lang_id is not None:
+            lang_args = torch.LongTensor([LANG_NAME2ID[lang_id]]).to(self.device)
+        else:
+            lang_args = None
         texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
         emb_texts = self.embedding_model(texts, symbol_id)
         src_lens = torch.LongTensor([len(text)]).to(self.device)
         max_src_len = max(src_lens)
         
         with torch.no_grad():
-            output = self.model(spk_args, emb_texts, src_lens, max_src_len, average_spk_emb=True)
+            output = self.model(spk_args, emb_texts, src_lens, max_src_len, lang_args=lang_args, average_spk_emb=True)
 
         return output

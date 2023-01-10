@@ -83,7 +83,7 @@ class FastSpeech2(pl.LightningModule):
             # output = output + self.speaker_emb(speaker_args).unsqueeze(1).expand(
             #     -1, max_src_len, -1
             # )
-        if self.language_emb is not None:
+        if self.language_emb is not None and lang_args is not None:
             lang_emb = self.language_emb(lang_args)
             output += lang_emb.unsqueeze(1).expand(-1, max_src_len, -1)
 
