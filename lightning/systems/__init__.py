@@ -25,6 +25,7 @@ SYSTEM = {
     "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
 
     "tacot2u": t2u.TacoT2USystem,
+    "fscl-t2u": t2u.TransEmbSystem,
 
     "conti-ae": language.ContiAESystem,
 }

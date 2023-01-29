@@ -29,11 +29,12 @@ def set_format(keys: List[str]):
 
 class Saver(Callback):
 
-    def __init__(self, data_configs, log_dir, result_dir):
+    def __init__(self, data_configs, log_dir, result_dir, re_id=True):
         super().__init__()
         self.visualizer = AttentionVisualizer()
         self.data_configs = data_configs
         self.id2symbols = build_id2symbols(self.data_configs)
+        self.re_id = re_id
         increment = 0
         self.re_id_increment = {}
         for k, v in self.id2symbols.items():
@@ -171,7 +172,10 @@ class Saver(Callback):
                 if id == 0:
                     y_labels.append(0)
                 else:
-                    y_labels.append(self.id2symbols[lang_id][id - self.re_id_increment[lang_id]])
+                    if self.re_id:
+                        y_labels.append(self.id2symbols[lang_id][id - self.re_id_increment[lang_id]])
+                    else:
+                        y_labels.append(self.id2symbols[lang_id][id])
             info = {
                 "title": "Alignment",
                 "x_labels": x_labels,
@@ -195,8 +199,6 @@ class Saver(Callback):
             if gt_id == 0:
                 break
             # t2u only predict one kind of symbol, no re_id is required (unlike SSLBaseline recognized multilingual symbols)
-            # gt_id = int(gt_id) - self.re_id_increment[symbol_id]
-            # pred_id = int(pred_id) - self.re_id_increment[symbol_id]
             gt_sentence.append(self.id2symbols[symbol_id][gt_id])
             pred_sentence.append(self.id2symbols[symbol_id][pred_id])
 

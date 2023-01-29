@@ -22,6 +22,7 @@ DATA_MODULE = {
     "pr-ssl-protonet": phoneme_recognition.FSCLDataModule,
 
     "tacot2u": t2u.T2UDataModule,
+    "fscl-t2u": t2u.FSCLDataModule,
 
     "conti-ae": language.ContiAEDataModule,
 }

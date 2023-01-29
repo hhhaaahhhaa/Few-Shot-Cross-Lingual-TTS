@@ -1,0 +1,33 @@
+codebook_size: 128
+transformer:
+  d_model: 256
+  nhead: 4
+  layer: 2
+  dim_feedforward: [256, 256]
+  dropout: 0.2
+tacotron2:
+  symbols_embedding_dim: 256
+  mask_padding: True
+
+  # Encoder parameters
+  encoder_kernel_size: 5
+  encoder_n_convolutions: 3
+  encoder_embedding_dim: 256
+
+  # Decoder parameters
+  decoder_rnn_dim: 512
+  prenet_dim: 256
+  max_decoder_ratio: 10
+  gate_threshold: 0.5
+  p_attention_dropout: 0.1
+  p_decoder_dropout: 0.1
+
+  # Attention parameters
+  attention_rnn_dim: 512
+  attention_dim: 128
+
+  # Location Layer parameters
+  attention_location_n_filters: 32
+  attention_location_kernel_size: 31
+
+  d_unit: 256
