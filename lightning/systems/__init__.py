@@ -26,6 +26,7 @@ SYSTEM = {
 
     "tacot2u": t2u.TacoT2USystem,
     "fscl-t2u": t2u.TransEmbSystem,
+    "fscl-t2u-tune": t2u.TransEmbTuneSystem,
 
     "conti-ae": language.ContiAESystem,
 }

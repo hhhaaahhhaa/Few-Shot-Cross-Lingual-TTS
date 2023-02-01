@@ -33,7 +33,7 @@ if Define.CUDA_LAUNCH_BLOCKING:
 
 TRAINER_CONFIG = {
     "gpus": -1 if torch.cuda.is_available() else None,
-    "accelerator": "ddp" if torch.cuda.is_available() else None,
+    "strategy": "ddp" if torch.cuda.is_available() else None,
     "auto_select_gpus": True,
     "process_position": 1,
     "profiler": 'simple',
@@ -199,6 +199,12 @@ def main(args, configs):
             print("Start Training!")
         pl.seed_everything(43, True)
         trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
+
+        # Tune is viewed as tune_init + train
+        # TODO: Control this from cmd
+        tune_flag = True
+        if tune_flag:
+            model.tune_init(data_configs)
         trainer.fit(model, datamodule=datamodule)
 
     # TODO: Somewhat dirty, to be refactored

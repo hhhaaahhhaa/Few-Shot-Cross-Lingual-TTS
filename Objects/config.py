@@ -19,6 +19,11 @@ class LanguageDataConfigReader(object):
                 config["symbol_id"] = config["lang_id"]
                 config["use_real_phoneme"] = True
         
+        # TODO: temporary hacking since few-shot task config format is currently incorrect
+        config["target"] = {
+            "unit_name": "zhkofrdees-hubert_large_ll60k-24-512c",
+            "n_symbols": 512,
+        }
         if "target" in config:
             target = config["target"]
             if "n_symbols" in target:
