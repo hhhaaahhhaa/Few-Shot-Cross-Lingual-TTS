@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import jiwer
 from tqdm import tqdm
+import json
+import yaml
 from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
@@ -14,35 +16,50 @@ from lightning.callbacks.t2u.saver import Saver
 from lightning.utils.tool import ssl_match_length
 from lightning.model.reduction import PhonemeQueryExtractor
 from ..language.embeddings import MultilingualEmbedding
+from ..language.FastSpeech2 import BaselineSystem
 from ..phoneme_recognition.loss import PRFramewiseLoss
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
 from .downstreams import Downstream1
+from Objects.config import LanguageDataConfigReader
 
 
-class TransEmbTuneSystem(System):
+class TransEmbE2ETuneSystem(System):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def build_model(self):
+        t2u_model_config = self.model_config["t2u"]
         id2symbols = build_id2symbols(self.data_configs)
         n_units = len(id2symbols[self.data_configs[0]["target"]["unit_name"]])   # all target unit names from data configs should be the same!
         setattr(hparams, "n_units", n_units)
-        encoder_dim = self.model_config["tacotron2"]["symbols_embedding_dim"]
+        encoder_dim = t2u_model_config["tacotron2"]["symbols_embedding_dim"]
         self.embedding_model = MultilingualEmbedding(id2symbols, dim=encoder_dim)
-        self.model = TacoT2U(self.model_config)
+        self.model = TacoT2U(t2u_model_config)
         self.loss_func = PRFramewiseLoss()
 
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
         self.embedding_generator = Downstream1(
-            self.model_config,
+            t2u_model_config,
             n_in_layers=Define.UPSTREAM_LAYER,
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX
         )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+
+        # Load tuned u2s
+        with open(self.model_config["u2s"]["model_cards"], 'r', encoding='utf-8') as f:  # "evaluation/_exp1/model.json"
+            MODEL_CARDS = json.load(f)
+        config_reader = LanguageDataConfigReader()
+        model_info = MODEL_CARDS[self.model_config["u2s"]["model_name"]]  # "u2s-zhkofrdees-hubert_large_ll60k-24-512c"
+
+        # Load model and data
+        data_configs = [config_reader.read(path) for path in model_info["config_paths"]]  # reconstruct data config in local since data path is different
+        self.u2s = BaselineSystem.load_from_checkpoint(model_info["ckpt"], data_configs=data_configs)
+        self.u2s.eval()
+        self.u2s_loss_func = self.u2s.loss_func
 
     def build_optimized_model(self):
         return nn.ModuleList([self.embedding_model, self.model])
@@ -115,16 +132,8 @@ class TransEmbTuneSystem(System):
             p.requires_grad = True
         print("Generate reference done.")
         self.cpu()
-        for p in self.embedding_model.parameters():
-            print(p.requires_grad)
 
-        # tune partial model
-        # for p in self.embedding_model.parameters():
-        #     p.requires_grad = False
-        # for p in self.model.parameters():
-        #     p.requires_grad = False
-
-    def common_step(self, batch, batch_idx, train=True):
+    def common_t2u_step(self, batch, batch_idx, train=True):
         emb_texts = self.embedding_model(batch[3])
         # (emb_texts, text_lengths, units, max_len, output_lengths, spks, lang_ids)
         inputs = (emb_texts, batch[4], batch[6], batch[5], batch[7], batch[3], batch[9])
@@ -135,10 +144,36 @@ class TransEmbTuneSystem(System):
         # print(batch[6].shape)
         loss = self.loss_func(batch[6], output)
         loss_dict = {
-            "Total Loss": loss,
+            "T2U Loss": loss,
         }
 
         return loss_dict, output, alignments
+
+    def common_u2s_step(self, logits, batch, batch_idx, train=True):
+        table = self.u2s.embedding_model.tables["table-zhkofrdees-hubert_large_ll60k-24-512c"]
+        emb_units = F.softmax(logits[:, :-1, :], dim=2) @ table  # B, L, d_enc, note that t2u append <eos> at the end so need to adjust the shape
+        output = self.u2s.model(batch[2], emb_units, *(batch[4:]))
+        loss = self.u2s_loss_func(batch[:-1], output)
+        loss_dict = {
+            "U2S Loss"         : loss[0],
+            "Mel Loss"         : loss[1],
+            "Mel-Postnet Loss" : loss[2],
+            "Pitch Loss"       : loss[3],
+            "Energy Loss"      : loss[4],
+            "Duration Loss"    : loss[5],
+        }
+        return loss_dict, output
+
+    def common_step(self, batch, batch_idx, train=True):
+        t2u_batch, u2s_batch = batch["t2u"], batch["u2s"]
+        t2u_loss_dict, t2u_output, alignments = self.common_t2u_step(t2u_batch, batch_idx, train)
+        u2s_loss_dict, u2s_output = self.common_u2s_step(t2u_output, u2s_batch, batch_idx, train)
+
+        loss_dict = t2u_loss_dict
+        loss_dict.update(u2s_loss_dict)
+        loss_dict["Total Loss"] = loss_dict["T2U Loss"] + loss_dict["U2S Loss"]
+        
+        return loss_dict, t2u_output, alignments
 
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
         """
@@ -156,14 +191,15 @@ class TransEmbTuneSystem(System):
             target_symbol_ids
         )
         """
-        assert len(batch) == 11, f"data with 11 elements, but get {len(batch)}"
+        assert len(batch["t2u"]) == 11, f"data with 11 elements, but get {len(batch)}"
     
     def on_validation_batch_start(self, batch, batch_idx, dataloader_idx):
-        assert len(batch) == 11, f"data with 11 elements, but get {len(batch)}"
+        assert len(batch["t2u"]) == 11, f"data with 11 elements, but get {len(batch)}"
     
     def training_step(self, batch, batch_idx):
         train_loss_dict, predictions, alignment = self.common_step(batch, batch_idx, train=True)
 
+        batch = batch["t2u"]
         mask = (batch[6] != 0)
         acc = ((batch[6] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
         self.log_dict({"Train/Acc": acc.item()}, sync_dist=True)
@@ -177,8 +213,9 @@ class TransEmbTuneSystem(System):
                 '_batch': batch, 'symbol_id': batch[10][0], 'alignment': alignment}
 
     def validation_step(self, batch, batch_idx):
-        val_loss_dict, predictions, alignment = self.common_step(batch, batch_idx)
+        val_loss_dict, predictions, alignment = self.common_step(batch, batch_idx, train=False)
 
+        batch = batch["t2u"]
         mask = (batch[6] != 0)
         acc = ((batch[6] == predictions.argmax(dim=2)) * mask).sum() / mask.sum()
         self.log_dict({"Val/Acc": acc.item()}, sync_dist=True)
@@ -206,7 +243,7 @@ class TransEmbTuneSystem(System):
         state_dict = checkpoint["state_dict"]
         new_state_dict = OrderedDict()
         for k in state_dict:
-            if k.split('.')[0] == "upstream" or k.split('.')[0] == "embedding_generator":
+            if k.split('.')[0] in ["upstream", "u2s", "embedding_generator"]:
                 continue
             new_state_dict[k] = state_dict[k]
         checkpoint["state_dict"] = new_state_dict

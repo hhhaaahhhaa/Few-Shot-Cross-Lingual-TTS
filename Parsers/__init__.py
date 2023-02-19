@@ -12,6 +12,7 @@ from .jsut import JSUTPreprocessor, JSUTRawParser
 from .alffa import ALFFASWRawParser, ALFFAAMRawParser, ALFFAWORawParser, ALFFASWPreprocessor, ALFFAAMPreprocessor, ALFFAWOPreprocessor
 from .m_ailabs import MAILABSPreprocessor, MAILABSRawParser
 from .lad import LADPreprocessor, LADRawParser
+from .csmsc import CSMSCPreprocessor, CSMSCRawParser
 
 
 PREPROCESSORS = {
@@ -28,6 +29,7 @@ PREPROCESSORS = {
     "ALFFA-WO": ALFFAWOPreprocessor,
     "M-AILABS": MAILABSPreprocessor,
     "LAD": LADPreprocessor,
+    "CSMSC": CSMSCPreprocessor,
 }
 
 RAWPARSERS = {
@@ -44,6 +46,7 @@ RAWPARSERS = {
     "ALFFA-WO": ALFFAWORawParser,
     "M-AILABS": MAILABSRawParser,
     "LAD": LADRawParser,
+    "CSMSC": CSMSCRawParser,
 }
 
 

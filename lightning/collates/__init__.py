@@ -3,3 +3,4 @@ from .LanguageCollate import LanguageCollate
 from .TextCollate import TextCollate
 from .PRCollate import SSLPRCollate
 from .T2UCollate import T2UCollate
+from .MixCollate import MixCollate
