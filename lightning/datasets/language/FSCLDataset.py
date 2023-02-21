@@ -37,7 +37,6 @@ class FSCLDataset(Dataset):
     def __getitem__(self, idx):
         basename = self.basename[idx]
         speaker = self.speaker[idx]
-        speaker_id = self.speaker_map[speaker]
         query = {
             "spk": speaker,
             "basename": basename,
@@ -89,7 +88,7 @@ class FSCLDataset(Dataset):
 
         sample = {
             "id": basename,
-            "speaker": speaker_id,
+            "speaker": speaker,
             "text": text,
             "raw_text": raw_text,
             "mel": mel,

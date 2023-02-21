@@ -12,7 +12,10 @@ from dlhlp_lib.vocoders import get_vocoder
 
 import Define
 from ..base_saver import BaseSaver
+from lightning.build import build_id2symbols
 from lightning.utils.log import synth_one_sample_with_target, synth_samples
+from text.define import LANG_ID2NAME
+from ..t2u.plot import AttentionVisualizer
 
 
 CSV_COLUMNS = ["Total Loss"]
@@ -28,7 +31,10 @@ def set_format(keys: List[str]):
 class Saver(BaseSaver):
     def __init__(self, data_configs, model_config, log_dir, result_dir):
         super().__init__(log_dir, result_dir)
+        self.visualizer = AttentionVisualizer()
         self.data_configs = data_configs
+        self.id2symbols = build_id2symbols(self.data_configs)
+        
         self.model_config = model_config
         self.sr = AUDIO_CONFIG["audio"]["sampling_rate"]
         
@@ -84,7 +90,7 @@ class Saver(BaseSaver):
         loss = outputs['losses']
         output = outputs['output']
         _batch = outputs['_batch']
-        synth_output = outputs['synth']
+        synth_output = outputs.get('synth', None)
         
         step = pl_module.global_step + 1
         if isinstance(pl_module.logger, list):
@@ -118,7 +124,8 @@ class Saver(BaseSaver):
                 self.log_audio(logger, "Validation", step, basename, "synthesized", wav_prediction, self.sr, metadata)
                 plt.close(fig)
 
-            synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
+            if synth_output is not None:
+                synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
 
     def on_validation_epoch_end(self, trainer, pl_module):
         loss_dict = merge_dicts(self.val_loss_dicts)
@@ -153,3 +160,49 @@ class Saver(BaseSaver):
         os.makedirs(audio_dir, exist_ok=True)
 
         synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
+
+    # For TransEmb System
+    def log_codebook_attention(self, logger, attn, lang_id, batch_idx, step, stage="val"):
+        """
+        attn: Tensor with size 1, nH, n_symbols, codebook_size
+        """
+        _, nH, n_symbols, codebook_size = attn.shape
+        lang_id = LANG_ID2NAME[lang_id]
+        symbols = self.id2symbols[lang_id]
+        assert n_symbols == len(symbols)
+
+        for hid in range(nH):
+            info = {
+                "title": f"Head-{hid}",
+                "x_labels": [str(i) for i in range(codebook_size)],
+                "y_labels": symbols,
+                "attn": attn[0][hid].detach().cpu().numpy()
+            }
+            
+            fig = self.visualizer.plot(info)
+            figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}_h{hid}"
+            if isinstance(logger, pl.loggers.CometLogger):
+                logger.experiment.log_figure(
+                    figure_name=figure_name,
+                    figure=fig,
+                    step=step,
+                )
+            plt.close(fig)
+    
+    def log_layer_weights(self, logger, layer_weights, step, stage="val"):
+        info = {
+            "title": "Layer weights",
+            "x_labels": [str(i) for i in range(len(layer_weights))],
+            "y_labels": ["Weight"],
+            "attn": layer_weights.view(1, -1).detach().cpu().numpy()
+        }
+        
+        fig = self.visualizer.plot(info)
+        figure_name = f"{stage}/weights/step_{step}"
+        if isinstance(logger, pl.loggers.CometLogger):
+            logger.experiment.log_figure(
+                figure_name=figure_name,
+                figure=fig,
+                step=step,
+            )
+        plt.close(fig)

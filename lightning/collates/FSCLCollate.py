@@ -76,12 +76,12 @@ class FSCLCollate(object):
             repr_info = {}
             repr_info["lang_id"] = lang_id
             repr_info["n_symbols"] = n_symbols
-            repr_info["texts"] = [data[idx]["text"] for idx in idxs]
-            repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
-            repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idxs]
+            repr_info["phonemes"] = [data[idx]["text"] for idx in idxs]
+            repr_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
+            repr_info["avg_frames"] = [data[idx]["avg-frames"] for idx in idxs]
             # calc_ref = time.time() - st1
 
-        return (sup_out, qry_out, repr_info, lang_id)
+        return (sup_out, qry_out, repr_info)
 
 
     def split_sup_qry(self, data, idxs, shots, queries):

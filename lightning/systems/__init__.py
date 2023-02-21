@@ -13,6 +13,7 @@ SYSTEM = {
     # "semi-fscl-tune": language.SemiTransEmbTuneSystem,
     "baseline": language.BaselineSystem,
     # "baseline-tune": language.BaselineTuneSystem,
+    "fscl": language.TransEmbSystem,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,

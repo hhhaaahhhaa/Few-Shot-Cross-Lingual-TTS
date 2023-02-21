@@ -9,6 +9,7 @@ DATA_MODULE = {
     # "semi-fscl": language.SemiFSCLDataModule,
     # "semi-fscl-tune": language.SemiFSCLTuneDataModule,
     "baseline": language.FastSpeech2DataModule,
+    "fscl": language.FSCLDataModule,
     # "baseline-tune": language.FastSpeech2TuneDataModule,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,

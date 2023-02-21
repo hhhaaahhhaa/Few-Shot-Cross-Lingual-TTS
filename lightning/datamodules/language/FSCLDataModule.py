@@ -6,7 +6,7 @@ import Define
 from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, UnitFSCLDataset, TextDataset, few_shot_task_dataset
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
-from lightning.collates import GeneralFSCLCollate
+from lightning.collates import GeneralFSCLCollate, FSCLCollate
 from .FastSpeech2DataModule import FastSpeech2DataModule, FastSpeech2TuneDataModule
 
 
@@ -77,13 +77,13 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.train_task_dataset = few_shot_task_dataset(
             self.train_dataset, self.train_ways, self.train_shots, self.train_queries,
-            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type
+            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
         )
 
     def _validation_setup(self):
         self.val_task_dataset = few_shot_task_dataset(
             self.val_dataset, self.test_ways, self.test_shots, self.test_queries,
-            n_tasks_per_label=4, type=self.meta_type
+            n_tasks_per_label=4, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
         )
         with seed_all(43):
             self.val_SQids2Tid = prefetch_tasks(self.val_task_dataset, 'val', self.log_dir)

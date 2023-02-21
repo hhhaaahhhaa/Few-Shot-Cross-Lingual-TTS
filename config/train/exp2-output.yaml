@@ -1,4 +1,4 @@
 path:
-  ckpt_path: "./output/ckpt/exp1"
-  log_path: "./output/log/exp1"
-  result_path: "./output/result/exp1"
+  ckpt_path: "./output/ckpt/exp2"
+  log_path: "./output/log/exp2"
+  result_path: "./output/result/exp2"
