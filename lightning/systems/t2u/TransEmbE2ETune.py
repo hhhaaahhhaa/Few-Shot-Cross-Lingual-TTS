@@ -8,6 +8,7 @@ import yaml
 from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
+from dlhlp_lib.transformers import CodebookAttention
 
 import Define
 from lightning.build import build_id2symbols
@@ -20,7 +21,7 @@ from ..language.FastSpeech2 import BaselineSystem
 from ..phoneme_recognition.loss import PRFramewiseLoss
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
-from .downstreams import Downstream1
+from .downstreams import Downstream1, Downstream2
 from Objects.config import LanguageDataConfigReader
 
 
@@ -49,6 +50,9 @@ class TransEmbE2ETuneSystem(System):
         )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
 
+        self.build_u2s()
+
+    def build_u2s(self):
         # Load tuned u2s
         with open(self.model_config["u2s"]["model_cards"], 'r', encoding='utf-8') as f:  # "evaluation/_exp1/model.json"
             MODEL_CARDS = json.load(f)
@@ -68,14 +72,10 @@ class TransEmbE2ETuneSystem(System):
         saver = Saver(self.data_configs, self.log_dir, self.result_dir)
         return saver
 
-    def tune_init(self, data_configs):
+    def generate_reference_info(self, data_config):
         from dlhlp_lib.utils import batchify, segment2duration
         from Parsers.utils import read_queries_from_txt
-        from text.define import LANG_ID2SYMBOLS
         from text import text_to_sequence
-        
-        assert len(data_configs) == 1
-        data_config = data_configs[0]
 
         print("Generate reference...")
         data_parser = Define.DATAPARSERS[data_config["name"]]
@@ -120,17 +120,31 @@ class TransEmbE2ETuneSystem(System):
                 ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())
                 x = self.embedding_generator(ssl_repr, info["lens"])
                 hiddens.extend([x1 for x1 in x])
+        print("Generate reference done.")
+        
+        return {
+            "hiddens": hiddens,
+            "avg_frames_list": avg_frames_list,
+            "phonemes_list": phonemes_list,
+            "lang_id": lang_id,
+            "symbol_id": symbol_id,
+        }
+
+    def tune_init(self, data_configs):
+        from text.define import LANG_ID2SYMBOLS
+
+        assert len(data_configs) == 1
+        ref_info = self.generate_reference_info(data_configs[0])
 
         # Merge all information and perform embedding layer initialization
         with torch.no_grad():
-            table = self.phoneme_query_extractor(hiddens, avg_frames_list, 
-                                len(LANG_ID2SYMBOLS[lang_id]), phonemes_list)  # 1, n_symbols, dim
+            table = self.phoneme_query_extractor(ref_info["hiddens"], ref_info["avg_frames_list"], 
+                                len(LANG_ID2SYMBOLS[ref_info["lang_id"]]), ref_info["phonemes_list"])  # 1, n_symbols, dim
             table = table.squeeze(0)  # n_symbols, dim
             # print(table.shape)
-            self.embedding_model.tables[f"table-{symbol_id}"].copy_(table)
+            self.embedding_model.tables[f"table-{ref_info['symbol_id']}"].copy_(table)
         for p in self.embedding_model.parameters():
             p.requires_grad = True
-        print("Generate reference done.")
         self.cpu()
 
     def common_t2u_step(self, batch, batch_idx, train=True):
@@ -276,6 +290,89 @@ class TransEmbE2ETuneSystem(System):
             output = self.model.inference(emb_texts, None, None)
 
         return output
+
+
+class TransEmbCE2ETuneSystem(TransEmbE2ETuneSystem):
+    """
+    Change Downstream1 to Downstream2
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_model(self):
+        t2u_model_config = self.model_config["t2u"]
+        id2symbols = build_id2symbols(self.data_configs)
+        n_units = len(id2symbols[self.data_configs[0]["target"]["unit_name"]])   # all target unit names from data configs should be the same!
+        setattr(hparams, "n_units", n_units)
+        encoder_dim = t2u_model_config["tacotron2"]["symbols_embedding_dim"]
+        self.embedding_model = MultilingualEmbedding(id2symbols, dim=encoder_dim)
+        self.model = TacoT2U(t2u_model_config)
+        self.loss_func = PRFramewiseLoss()
+
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.embedding_generator = Downstream2(
+            t2u_model_config,
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            specific_layer=Define.LAYER_IDX
+        )
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+
+        super().build_u2s()
+
+
+class TransEmbC2E2ETuneSystem(TransEmbE2ETuneSystem):
+    """
+    Passed through Codebook after PhonemeQuery extraction
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_model(self):
+        t2u_model_config = self.model_config["t2u"]
+        id2symbols = build_id2symbols(self.data_configs)
+        n_units = len(id2symbols[self.data_configs[0]["target"]["unit_name"]])   # all target unit names from data configs should be the same!
+        setattr(hparams, "n_units", n_units)
+        encoder_dim = t2u_model_config["tacotron2"]["symbols_embedding_dim"]
+        self.embedding_model = MultilingualEmbedding(id2symbols, dim=encoder_dim)
+        self.model = TacoT2U(t2u_model_config)
+        self.loss_func = PRFramewiseLoss()
+
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.embedding_generator = Downstream1(
+            t2u_model_config,
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            specific_layer=Define.LAYER_IDX
+        )
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+        self.codebook_attention = CodebookAttention(
+            codebook_size=t2u_model_config["codebook_size"],
+            embed_dim=t2u_model_config["transformer"]["d_model"],
+            num_heads=t2u_model_config["transformer"]["nhead"],
+        )
+
+        super().build_u2s()
+
+    def tune_init(self, data_configs):
+        from text.define import LANG_ID2SYMBOLS
+
+        assert len(data_configs) == 1
+        ref_info = super().generate_reference_info(data_configs[0])
+
+        # Merge all information and perform embedding layer initialization
+        with torch.no_grad():
+            table_pre = self.phoneme_query_extractor(ref_info["hiddens"], ref_info["avg_frames_list"], 
+                                len(LANG_ID2SYMBOLS[ref_info["lang_id"]]), ref_info["phonemes_list"])  # 1, n_symbols, dim
+            table, _ = self.codebook_attention(table_pre)
+            table = table.squeeze(0)  # n_symbols, dim
+            # print(table.shape)
+            self.embedding_model.tables[f"table-{ref_info['symbol_id']}"].copy_(table)
+        for p in self.embedding_model.parameters():
+            p.requires_grad = True
+        self.cpu()
 
 
 def schedule_f(step: int) -> float:

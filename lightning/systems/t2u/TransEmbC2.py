@@ -5,6 +5,7 @@ import jiwer
 from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
+from dlhlp_lib.transformers import CodebookAttention
 
 import Define
 from lightning.build import build_id2symbols
@@ -16,10 +17,10 @@ from lightning.model.reduction import PhonemeQueryExtractor
 from ..phoneme_recognition.loss import PRFramewiseLoss
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
-from .downstreams import Downstream2
+from .downstreams import Downstream1
 
 
-class TransEmbCSystem(AdaptorSystem):
+class TransEmbC2System(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -35,16 +36,21 @@ class TransEmbCSystem(AdaptorSystem):
 
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
-        self.embedding_generator = Downstream2(
+        self.embedding_generator = Downstream1(
             self.model_config,
             n_in_layers=Define.UPSTREAM_LAYER,
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX
         )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+        self.codebook_attention = CodebookAttention(
+            codebook_size=self.model_config["codebook_size"],
+            embed_dim=self.model_config["transformer"]["d_model"],
+            num_heads=self.model_config["transformer"]["nhead"],
+        )
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.embedding_generator, self.model])
+        return nn.ModuleList([self.codebook_attention, self.embedding_generator, self.model])
 
     def build_saver(self):
         self.saver = Saver(self.data_configs, self.log_dir, self.result_dir, re_id=False)
@@ -60,12 +66,11 @@ class TransEmbCSystem(AdaptorSystem):
             ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
             ssl_repr = ssl_repr.detach()
 
-        if return_attn:
-            x, attn = self.embedding_generator(ssl_repr, sup_info["lens"].cpu(), need_weights=True)
-        else:
-            x = self.embedding_generator(ssl_repr, sup_info["lens"].cpu())
-        table = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
+        x = self.embedding_generator(ssl_repr, sup_info["lens"].cpu())
+        table_pre = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
                             sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, n_layers, dim
+
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
         table = table.squeeze(0)  # n_symbols, dim
         
         # print("Table shape and gradient required: ", table.shape)
@@ -135,7 +140,10 @@ class TransEmbCSystem(AdaptorSystem):
         if batch_idx == 0:
             layer_weights = F.softmax(self.embedding_generator.weighted_sum.weight_raw, dim=0)
             self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
-
+        if batch_idx < 4:
+            lang_id = qry_batch[9][0].item()  # all batch belongs to the same language
+            self.saver.log_codebook_attention(self.logger, attn, lang_id, batch_idx, self.global_step + 1, "val")
+            
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
         self.log_dict(loss_dict, sync_dist=True, batch_size=len(qry_batch[0]))

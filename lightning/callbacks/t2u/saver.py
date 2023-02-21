@@ -194,23 +194,25 @@ class Saver(Callback):
             plt.close(fig)
 
     # For TransEmbCSystem
-    def log_codebook_attention(self, logger, attn, symbol_id, batch_idx, step, stage="val"):
+    def log_codebook_attention(self, logger, attn, lang_id, batch_idx, step, stage="val"):
         """
-        TODO: In fact we are getting framewise results, but not symbols-code attention since we now pass codebook before averaging
-        attn: Tensor with size B, nH, n_symbols, codebook_size
+        attn: Tensor with size 1, nH, n_symbols, codebook_size
         """
-        B, nH, n_symbols, codebook_size = attn.shape
-        symbols = self.id2symbols[symbol_id]
+        _, nH, n_symbols, codebook_size = attn.shape
+        lang_id = LANG_ID2NAME[lang_id]
+        symbols = self.id2symbols[lang_id]
+        assert n_symbols == len(symbols)
+
         for hid in range(nH):
             info = {
                 "title": f"Head-{hid}",
-                "x_labels": symbols,
-                "y_labels": [str(i) for i in range(codebook_size)],
-                "attn": attn[0][hid].transpose(0, 1).detach().cpu().numpy()
+                "x_labels": [str(i) for i in range(codebook_size)],
+                "y_labels": symbols,
+                "attn": attn[0][hid].detach().cpu().numpy()
             }
             
             fig = self.visualizer.plot(info)
-            figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}"
+            figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}_h{hid}"
             if isinstance(logger, pl.loggers.CometLogger):
                 logger.experiment.log_figure(
                     figure_name=figure_name,

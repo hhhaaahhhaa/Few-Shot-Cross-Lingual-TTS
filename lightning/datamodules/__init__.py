@@ -24,8 +24,11 @@ DATA_MODULE = {
     "tacot2u": t2u.T2UDataModule,
     "fscl-t2u": t2u.FSCLDataModule,
     "fscl-t2u-codebook": t2u.FSCLDataModule,
+    "fscl-t2u-codebook2": t2u.FSCLDataModule,
     "fscl-t2u-tune": t2u.T2UDataModule,
     "fscl-t2u-e2e-tune": t2u.MixDataModule,
+    "fscl-t2u-c-e2e-tune": t2u.MixDataModule,
+    "fscl-t2u-c2-e2e-tune": t2u.MixDataModule,
 
     "conti-ae": language.ContiAEDataModule,
 }
