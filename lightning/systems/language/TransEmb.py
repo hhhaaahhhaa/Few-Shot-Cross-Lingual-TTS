@@ -7,10 +7,11 @@ from dlhlp_lib.s3prl import S3PRLExtractor
 from dlhlp_lib.transformers import CodebookAttention
 
 import Define
-from lightning.build import build_all_speakers, build_id2symbols
+from lightning.build import build_all_speakers
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.model.reduction import PhonemeQueryExtractor
+from lightning.utils.tool import ssl_match_length
 from lightning.callbacks.language.baseline_saver import Saver
 from .embeddings import *
 from ..t2u.downstreams import LinearDownstream
@@ -68,6 +69,7 @@ class TransEmbSystem(AdaptorSystem):
         self.upstream.eval()
         with torch.no_grad():
             ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
             ssl_repr = ssl_repr.detach()
 
         x = self.embedding_generator(ssl_repr)

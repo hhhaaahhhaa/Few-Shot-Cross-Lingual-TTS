@@ -73,15 +73,17 @@ class FSCLCollate(object):
 
             lang_id = data[idxs[0]]["lang_id"]
             n_symbols = data[idxs[0]]["n_symbols"]
-            repr_info = {}
-            repr_info["lang_id"] = lang_id
-            repr_info["n_symbols"] = n_symbols
-            repr_info["phonemes"] = [data[idx]["text"] for idx in idxs]
-            repr_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idxs]
-            repr_info["avg_frames"] = [data[idx]["avg-frames"] for idx in idxs]
+            sup_info = {}
+            sup_info["lang_id"] = lang_id
+            sup_info["n_symbols"] = n_symbols
+            sup_info["phonemes"] = [data[idx]["text"] for idx in sup_ids]
+            sup_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in sup_ids]
+            sup_info["avg_frames"] = [data[idx]["avg-frames"] for idx in sup_ids]
+            sup_info["lens"] = torch.LongTensor([sum(data[idx]["avg-frames"]) for idx in sup_ids])
+            sup_info["max_len"] = max(sup_info["lens"])
             # calc_ref = time.time() - st1
 
-        return (sup_out, qry_out, repr_info)
+        return (sup_out, qry_out, sup_info)
 
 
     def split_sup_qry(self, data, idxs, shots, queries):
