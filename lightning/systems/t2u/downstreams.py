@@ -167,7 +167,7 @@ class Downstream2(nn.Module):
             )
         )
 
-    def forward(self, repr, lengths):
+    def forward(self, repr, lengths, need_weights=False):
         """
         Args:
             repr: SSL representation with shape (B, L, n_layers, d_in).
@@ -181,6 +181,8 @@ class Downstream2(nn.Module):
         padding_mask = get_mask_from_lengths(lengths).to(x.device)
         for layer in self.layers[:-1]:
             x, _ = layer(x, src_key_padding_mask=padding_mask)
-        x, attn_weights = self.layers[-1](x, need_weights=False)
-
-        return x
+        x, attn_weights = self.layers[-1](x, need_weights=need_weights)
+        if need_weights:
+            return x, attn_weights
+        else:
+            return x

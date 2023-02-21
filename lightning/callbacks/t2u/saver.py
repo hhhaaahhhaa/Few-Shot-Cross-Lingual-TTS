@@ -169,7 +169,7 @@ class Saver(Callback):
             for id in _batch[6][idx]:
                 x_labels.append(self.id2symbols[symbol_id][id])
             for id in _batch[3][idx]:
-                if id == 0:
+                if id == 0:  # <PAD>
                     y_labels.append(0)
                 else:
                     if self.re_id:
@@ -192,6 +192,51 @@ class Saver(Callback):
                     step=step,
                 )
             plt.close(fig)
+
+    # For TransEmbCSystem
+    def log_codebook_attention(self, logger, attn, symbol_id, batch_idx, step, stage="val"):
+        """
+        TODO: In fact we are getting framewise results, but not symbols-code attention since we now pass codebook before averaging
+        attn: Tensor with size B, nH, n_symbols, codebook_size
+        """
+        B, nH, n_symbols, codebook_size = attn.shape
+        symbols = self.id2symbols[symbol_id]
+        for hid in range(nH):
+            info = {
+                "title": f"Head-{hid}",
+                "x_labels": symbols,
+                "y_labels": [str(i) for i in range(codebook_size)],
+                "attn": attn[0][hid].transpose(0, 1).detach().cpu().numpy()
+            }
+            
+            fig = self.visualizer.plot(info)
+            figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}"
+            if isinstance(logger, pl.loggers.CometLogger):
+                logger.experiment.log_figure(
+                    figure_name=figure_name,
+                    figure=fig,
+                    step=step,
+                )
+            plt.close(fig)
+    
+    # For TransEmb/TransEmbCSystem
+    def log_layer_weights(self, logger, layer_weights, step, stage="val"):
+        info = {
+            "title": "Layer weights",
+            "x_labels": [str(i) for i in range(len(layer_weights))],
+            "y_labels": ["Weight"],
+            "attn": layer_weights.view(1, -1).detach().cpu().numpy()
+        }
+        
+        fig = self.visualizer.plot(info)
+        figure_name = f"{stage}/weights/step_{step}"
+        if isinstance(logger, pl.loggers.CometLogger):
+            logger.experiment.log_figure(
+                figure_name=figure_name,
+                figure=fig,
+                step=step,
+            )
+        plt.close(fig)
 
     def recover_sentences(self, gt_ids, pred_ids, symbol_id: str) -> Tuple[List[str], List[str]]:
         gt_sentence, pred_sentence = [], []

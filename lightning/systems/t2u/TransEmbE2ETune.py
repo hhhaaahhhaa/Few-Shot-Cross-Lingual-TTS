@@ -231,18 +231,6 @@ class TransEmbE2ETuneSystem(System):
         state_dict = checkpoint["state_dict"]
         new_state_dict = OrderedDict()
         for k in state_dict:
-            if k.split('.')[0] == "upstream" or k.split('.')[0] == "embedding_generator":
-                continue
-            new_state_dict[k] = state_dict[k]
-        checkpoint["state_dict"] = new_state_dict
-
-        return checkpoint
-
-    def on_save_checkpoint(self, checkpoint):
-        """ (Hacking!) Remove pretrained weights in checkpoint to save disk space. """
-        state_dict = checkpoint["state_dict"]
-        new_state_dict = OrderedDict()
-        for k in state_dict:
             if k.split('.')[0] in ["upstream", "u2s", "embedding_generator"]:
                 continue
             new_state_dict[k] = state_dict[k]

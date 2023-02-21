@@ -202,7 +202,7 @@ def main(args, configs):
 
         # Tune is viewed as tune_init + train
         # TODO: Control this from cmd
-        tune_flag = True
+        tune_flag = False
         if tune_flag:
             model.tune_init(data_configs)
         trainer.fit(model, datamodule=datamodule)

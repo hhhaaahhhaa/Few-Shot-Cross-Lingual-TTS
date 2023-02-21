@@ -26,6 +26,7 @@ SYSTEM = {
 
     "tacot2u": t2u.TacoT2USystem,
     "fscl-t2u": t2u.TransEmbSystem,
+    "fscl-t2u-codebook": t2u.TransEmbCSystem,
     "fscl-t2u-tune": t2u.TransEmbTuneSystem,
     "fscl-t2u-e2e-tune": t2u.TransEmbE2ETuneSystem,
 
