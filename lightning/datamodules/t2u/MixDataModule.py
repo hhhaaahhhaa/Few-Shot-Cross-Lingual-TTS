@@ -130,7 +130,7 @@ class T2U2SDADataModule(pl.LightningDataModule):
     """
     def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
-        self.t2u_datamodule = MixDataModule([data_configs[0]], model_config,
+        self.t2u_datamodule = T2U2SDataModule([data_configs[0]], model_config,
                                                 train_config, algorithm_config, log_dir, result_dir)
         self.da_datamodule = DADataModule(data_configs[1:], model_config,
                                                 train_config, algorithm_config, log_dir, result_dir)
