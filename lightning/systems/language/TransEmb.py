@@ -76,7 +76,8 @@ class TransEmbSystem(AdaptorSystem):
         table_pre = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
                             sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, n_layers, dim
 
-        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        temperature = 4
+        table, attn = self.codebook_attention(table_pre / temperature, need_weights=return_attn)
         table = table.squeeze(0)  # n_symbols, dim
         
         # print("Table shape and gradient required: ", table.shape)

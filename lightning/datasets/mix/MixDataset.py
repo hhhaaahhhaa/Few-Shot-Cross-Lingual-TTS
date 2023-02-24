@@ -4,7 +4,7 @@ from ..language.FSCLDataset import UnitFSCLDataset
 from ..t2u.t2udataset import T2UDataset
 
 
-class MixDataset(Dataset):
+class T2U2SDataset(Dataset):
     """
     T2UDataset + UnitFSCLDataset
     """

@@ -27,10 +27,15 @@ DATA_MODULE = {
     "fscl-t2u": t2u.FSCLDataModule,
     "fscl-t2u-codebook": t2u.FSCLDataModule,
     "fscl-t2u-codebook2": t2u.FSCLDataModule,
+    
     "fscl-t2u-tune": t2u.T2UDataModule,
-    "fscl-t2u-e2e-tune": t2u.MixDataModule,
-    "fscl-t2u-c-e2e-tune": t2u.MixDataModule,
-    "fscl-t2u-c2-e2e-tune": t2u.MixDataModule,
+    "fscl-t2u-da-tune": t2u.T2UDADataModule,
+    "fscl-t2u-e2e-tune": t2u.T2U2SDataModule,
+    "fscl-t2u-c-e2e-tune": t2u.T2U2SDataModule,
+    "fscl-t2u-c2-e2e-tune": t2u.T2U2SDataModule,
+    "fscl-t2u-da-e2e-tune": t2u.T2U2SDADataModule,
+    "fscl-t2u-c-da-e2e-tune": t2u.T2U2SDADataModule,
+    "fscl-t2u-c2-da-e2e-tune": t2u.T2U2SDADataModule,
 
     "conti-ae": language.ContiAEDataModule,
 }

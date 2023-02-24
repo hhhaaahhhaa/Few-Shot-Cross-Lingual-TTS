@@ -184,6 +184,7 @@ def main(args, configs):
                 log_dir, result_dir, ckpt_dir
             )
         else:
+            print("Load from checkpoint...")
             model = system.load_from_checkpoint(
                 pretrain_ckpt_file, 
                 data_configs=data_configs, model_config=model_config, train_config=train_config, algorithm_config=algorithm_config,
@@ -201,8 +202,7 @@ def main(args, configs):
         trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
 
         # Tune is viewed as tune_init + train
-        # TODO: Control this from cmd
-        tune_flag = False
+        tune_flag = args.tune
         if tune_flag:
             model.tune_init(data_configs)
         trainer.fit(model, datamodule=datamodule)
@@ -317,6 +317,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--use_comet", action="store_true", default=False)
     parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--tune", action="store_true", default=False)
 
     args = parser.parse_args()
     Define.DEBUG = args.debug

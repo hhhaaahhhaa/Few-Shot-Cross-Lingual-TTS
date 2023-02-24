@@ -30,10 +30,16 @@ SYSTEM = {
     "fscl-t2u": t2u.TransEmbSystem,
     "fscl-t2u-codebook": t2u.TransEmbCSystem,
     "fscl-t2u-codebook2": t2u.TransEmbC2System,
+
     "fscl-t2u-tune": t2u.TransEmbTuneSystem,
+    "fscl-t2u-da-tune": t2u.TransEmbDATuneSystem,
     "fscl-t2u-e2e-tune": t2u.TransEmbE2ETuneSystem,
     "fscl-t2u-c-e2e-tune": t2u.TransEmbCE2ETuneSystem,
     "fscl-t2u-c2-e2e-tune": t2u.TransEmbC2E2ETuneSystem,
+    "fscl-t2u-da-e2e-tune": t2u.TransEmbDAE2ETuneSystem,
+    "fscl-t2u-c-da-e2e-tune": t2u.TransEmbCDAE2ETuneSystem,
+    "fscl-t2u-c2-da-e2e-tune": t2u.TransEmbC2DAE2ETuneSystem,
+
 
     "conti-ae": language.ContiAESystem,
 }

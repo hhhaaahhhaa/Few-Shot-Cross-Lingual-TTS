@@ -1,14 +1,16 @@
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
+from pytorch_lightning.trainer.supporters import CombinedLoader
 
 import Define
 from lightning.collates import MixCollate
-from lightning.datasets.mix import MixDataset
+from lightning.datasets.mix import T2U2SDataset
 from ..utils import EpisodicInfiniteWrapper
+from .DADataModule import DADataModule
 
 
-class MixDataModule(pl.LightningDataModule):
+class T2U2SDataModule(pl.LightningDataModule):
     """
     Combine UnitFSCL/T2UDatamodule, this is used for E2E tuning t2u2s.
     """
@@ -60,7 +62,7 @@ class MixDataModule(pl.LightningDataModule):
                         Define.DATAPARSERS[t2u_data_config["name"]],
                         t2u_data_config
                     )
-                    self.train_datasets.append(MixDataset(t2u_args, {}, u2s_args, u2s_kwargs))
+                    self.train_datasets.append(T2U2SDataset(t2u_args, {}, u2s_args, u2s_kwargs))
                 
                 # For unsupervised units use UnitFSCLDataset, otherwise FastSpeech2Dataset
                 if 'val' in t2u_data_config['subsets']:
@@ -75,7 +77,7 @@ class MixDataModule(pl.LightningDataModule):
                         Define.DATAPARSERS[t2u_data_config["name"]],
                         t2u_data_config
                     )
-                    self.val_datasets.append(MixDataset(t2u_args, {}, u2s_args, u2s_kwargs))
+                    self.val_datasets.append(T2U2SDataset(t2u_args, {}, u2s_args, u2s_kwargs))
             
             self.train_dataset = ConcatDataset(self.train_datasets)
             self.val_dataset = ConcatDataset(self.val_datasets)
@@ -120,3 +122,32 @@ class MixDataModule(pl.LightningDataModule):
             collate_fn=self.collate.collate_fn(),
         )
         return self.val_loader
+
+
+class T2U2SDADataModule(pl.LightningDataModule):
+    """
+    One batch contains data from T2U2S and data from DA
+    """
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
+        super().__init__()
+        self.t2u_datamodule = MixDataModule([data_configs[0]], model_config,
+                                                train_config, algorithm_config, log_dir, result_dir)
+        self.da_datamodule = DADataModule(data_configs[1:], model_config,
+                                                train_config, algorithm_config, log_dir, result_dir)
+
+    def setup(self, stage=None):
+        self.t2u_datamodule.setup(stage)
+        self.da_datamodule.setup(stage)
+
+    def train_dataloader(self):
+        return {
+            "t2u2s": self.t2u_datamodule.train_dataloader(),
+            "da": self.da_datamodule.train_dataloader()
+        }
+
+    def val_dataloader(self):
+        loaders = {
+            "t2u2s": self.t2u_datamodule.val_dataloader(),
+            "da": self.da_datamodule.val_dataloader()
+        }
+        return CombinedLoader(loaders, mode="min_size")

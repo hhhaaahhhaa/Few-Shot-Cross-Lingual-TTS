@@ -1,11 +1,13 @@
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
+from pytorch_lightning.trainer.supporters import CombinedLoader
 
 import Define
 from lightning.collates import T2UCollate
 from lightning.datasets.t2u import T2UDataset
 from ..utils import EpisodicInfiniteWrapper
+from .DADataModule import DADataModule
 
 
 class T2UDataModule(pl.LightningDataModule):
@@ -93,3 +95,32 @@ class T2UDataModule(pl.LightningDataModule):
             collate_fn=self.collate.collate_fn(sort=True, re_id=self.re_id),
         )
         return self.val_loader
+
+
+class T2UDADataModule(pl.LightningDataModule):
+    """
+    One batch contains data from T2U and data from DA
+    """
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
+        super().__init__()
+        self.t2u_datamodule = T2UDataModule([data_configs[0]], model_config,
+                                                train_config, algorithm_config, log_dir, result_dir)
+        self.da_datamodule = DADataModule(data_configs[1:], model_config,
+                                                train_config, algorithm_config, log_dir, result_dir)
+
+    def setup(self, stage=None):
+        self.t2u_datamodule.setup(stage)
+        self.da_datamodule.setup(stage)
+
+    def train_dataloader(self):
+        return {
+            "t2u": self.t2u_datamodule.train_dataloader(),
+            "da": self.da_datamodule.train_dataloader()
+        }
+
+    def val_dataloader(self):
+        loaders = {
+            "t2u": self.t2u_datamodule.val_dataloader(),
+            "da": self.da_datamodule.val_dataloader()
+        }
+        return CombinedLoader(loaders, mode="min_size")
