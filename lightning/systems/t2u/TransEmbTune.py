@@ -115,14 +115,20 @@ class TransEmbTuneSystem(System):
             p.requires_grad = True
         print("Generate reference done.")
         self.cpu()
-        for p in self.embedding_model.parameters():
-            print(p.requires_grad)
+        # for p in self.embedding_model.parameters():
+        #     print(p.requires_grad)
 
         # tune partial model
-        # for p in self.embedding_model.parameters():
-        #     p.requires_grad = False
-        # for p in self.model.parameters():
-        #     p.requires_grad = False
+        for p in self.embedding_model.parameters():
+            p.requires_grad = False
+        for p in self.model.encoder.parameters():
+            p.requires_grad = False
+        for p in self.model.decoder.parameters():
+            p.requires_grad = False
+        for p in self.model.decoder.linear_projection.parameters():
+            p.requires_grad = True
+        for p in self.model.decoder.final_proj.parameters():
+            p.requires_grad = True
 
     def common_step(self, batch, batch_idx, train=True):
         emb_texts = self.embedding_model(batch[3])

@@ -1,5 +1,5 @@
-name: fscl-t2u-codebook
-type: fscl-t2u-codebook
+name: fscl-orig
+type: fscl-orig
 
 _phn_emb_config:
   embedding: &embedding

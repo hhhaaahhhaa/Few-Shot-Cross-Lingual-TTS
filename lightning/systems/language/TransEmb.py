@@ -142,6 +142,34 @@ class TransEmbSystem(AdaptorSystem):
         self.log_dict(loss_dict, sync_dist=True)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': qry_batch}
     
+    
+    # def visualize_matching(self, batch, batch_idx):
+    #     if self.codebook_type != "table-sep":
+    #         _, _, repr_info, lang_id = batch[0]
+    #         with torch.no_grad():
+    #             ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+    #         matching = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
+    #         self.codebook_analyzer.visualize_matching(batch_idx, matching)
+    #     return None
+
+    # def log_matching(self, batch, batch_idx, stage="val"):
+    #     step = self.global_step + 1
+    #     _, _, repr_info, lang_id = batch[0]
+    #     with torch.no_grad():
+    #         ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+        
+    #     matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
+    #     for matching in matchings:
+    #         fig = self.codebook_analyzer.plot_matching(matching, quantized=False)
+    #         figure_name = f"{stage}/step_{step}_{batch_idx:03d}_{matching['title']}"
+    #         self.logger.experiment.log_figure(
+    #             figure_name=figure_name,
+    #             figure=fig,
+    #             step=step,
+    #         )
+    #         plt.close(fig)
+
+
     # def visualize_matching(self, batch, batch_idx):
     #     if self.codebook_type != "table-sep":
     #         _, _, repr_info, lang_id = batch[0]
@@ -179,3 +207,35 @@ class TransEmbSystem(AdaptorSystem):
         checkpoint["state_dict"] = new_state_dict
 
         return checkpoint
+
+class TransEmbOrigSystem(TransEmbSystem):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_embedding_table(self, batch, return_attn=False):  
+        _, _, sup_info = batch[0]
+
+        # TODO: Mel version
+        self.upstream.eval()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
+            ssl_repr = ssl_repr.detach()
+
+        # This is the order of original version
+        x = self.embedding_generator.weighted_sum(ssl_repr, dim=2)
+        table_pre = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
+                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, n_layers, dim
+        table_pre = self.embedding_generator.proj(table_pre)
+
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        table = table.squeeze(0)  # n_symbols, dim
+        
+        # print("Table shape and gradient required: ", table.shape)
+        # print(table.requires_grad)
+        
+        if return_attn:
+            return table, attn
+        else:
+            return table

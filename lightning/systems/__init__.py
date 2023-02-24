@@ -14,6 +14,7 @@ SYSTEM = {
     "baseline": language.BaselineSystem,
     # "baseline-tune": language.BaselineTuneSystem,
     "fscl": language.TransEmbSystem,
+    "fscl-orig": language.TransEmbOrigSystem,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
