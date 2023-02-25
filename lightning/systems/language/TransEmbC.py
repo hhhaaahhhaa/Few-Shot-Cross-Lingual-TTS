@@ -171,7 +171,7 @@ class TransEmbOrigSystem(TransEmbCSystem):
         self.codebook_attention = CodebookAttention(
             codebook_size=self.model_config["codebook_size"],
             embed_dim=encoder_dim,
-            num_heads=self.model_config["downstream"]["nhead"],
+            num_heads=self.model_config["downstream"]["transformer"]["nhead"],
         )
     
     def build_embedding_table(self, batch, return_attn=False):  

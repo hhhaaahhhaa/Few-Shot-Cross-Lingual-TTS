@@ -7,14 +7,13 @@ from . import t2u
 
 
 SYSTEM = {
-    # "fscl": language.TransEmbSystem,
-    # "fscl-tune": language.TransEmbTuneSystem,
     # "semi-fscl": language.SemiTransEmbSystem,
     # "semi-fscl-tune": language.SemiTransEmbTuneSystem,
     "baseline": language.BaselineSystem,
     # "baseline-tune": language.BaselineTuneSystem,
     "fscl": language.TransEmbSystem,
     "fscl-orig": language.TransEmbOrigSystem,
+    "fscl-tune": language.TransEmbTuneSystem,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,

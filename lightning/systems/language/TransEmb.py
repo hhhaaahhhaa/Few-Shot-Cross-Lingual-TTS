@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
-from dlhlp_lib.transformers import CodebookAttention
 
 import Define
 from lightning.build import build_all_speakers
@@ -36,7 +35,7 @@ class TransEmbSystem(AdaptorSystem):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
         self.embedding_generator = Downstream1(
-            self.model_config,
+            self.model_config["downstream"],
             n_in_layers=Define.UPSTREAM_LAYER,
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX

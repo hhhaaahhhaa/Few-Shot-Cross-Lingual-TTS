@@ -4,12 +4,12 @@ from . import t2u
 
 
 DATA_MODULE = {
-    # "fscl-tune": language.FastSpeech2DataModule,
     # "semi-fscl": language.SemiFSCLDataModule,
     # "semi-fscl-tune": language.SemiFSCLTuneDataModule,
     "baseline": language.FastSpeech2DataModule,
     "fscl": language.FSCLDataModule,
     "fscl-orig": language.FSCLDataModule,
+    "fscl-tune": language.FastSpeech2DataModule,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,
