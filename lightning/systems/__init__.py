@@ -12,6 +12,8 @@ SYSTEM = {
     "baseline": language.BaselineSystem,
     # "baseline-tune": language.BaselineTuneSystem,
     "fscl": language.TransEmbSystem,
+    "fscl-ada1": language.TransEmbADA1System,
+    "fscl-ada2": language.TransEmbADA2System,
     "fscl-orig": language.TransEmbOrigSystem,
     "fscl-tune": language.TransEmbTuneSystem,
 

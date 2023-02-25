@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
 
@@ -200,7 +201,7 @@ class TransEmbTuneSystem(System):
         state_dict = checkpoint["state_dict"]
         new_state_dict = OrderedDict()
         for k in state_dict:
-            if k.split('.')[0] in ["upstream", "embedding_generator"]
+            if k.split('.')[0] in ["upstream", "embedding_generator"]:
                 continue
             new_state_dict[k] = state_dict[k]
         checkpoint["state_dict"] = new_state_dict

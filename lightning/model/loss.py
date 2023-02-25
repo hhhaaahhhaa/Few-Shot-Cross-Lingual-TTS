@@ -99,3 +99,42 @@ class PhonemeClassificationLoss(nn.Module):
         preds = preds.transpose(1, 2)  # B, N, L
         target = batch[3]  # B, L
         return self.loss(preds, target)
+
+
+class FastSpeech2ADALoss(nn.Module):
+    """ FastSpeech2 ADA Loss, no variance adaptor-related loss"""
+
+    def __init__(self):
+        super().__init__()
+        self.mae_loss = nn.L1Loss()
+
+    def forward(self, inputs, predictions):
+        mel_targets = inputs
+        (
+            mel_predictions,
+            postnet_mel_predictions,
+            mel_masks
+        ) = predictions
+        mel_masks = ~mel_masks
+
+        mel_targets = mel_targets[:, : mel_masks.shape[1], :]
+        mel_masks = mel_masks[:, :mel_masks.shape[1]]
+
+        mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
+        postnet_mel_predictions = postnet_mel_predictions.masked_select(
+            mel_masks.unsqueeze(-1)
+        )
+        mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
+
+        mel_loss = self.mae_loss(mel_predictions, mel_targets)
+        postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+
+        total_loss = (
+            mel_loss + postnet_mel_loss
+        )
+
+        return (
+            total_loss,
+            mel_loss,
+            postnet_mel_loss,
+        )

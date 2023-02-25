@@ -16,7 +16,7 @@ from .speaker_encoder import SpeakerEncoder, LanguageEncoder
 
 
 class FastSpeech2(pl.LightningModule):
-    """ Modified FastSpeech2 """
+    """ Headless FastSpeech2 """
 
     def __init__(self, model_config, **kwargs):
         super(FastSpeech2, self).__init__()
