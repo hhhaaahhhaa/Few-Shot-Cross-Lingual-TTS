@@ -195,3 +195,14 @@ class TransEmbTuneSystem(System):
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch, 'synth': synth_predictions}
     
+    def on_save_checkpoint(self, checkpoint):
+        """ (Hacking!) Remove pretrained weights in checkpoint to save disk space. """
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for k in state_dict:
+            if k.split('.')[0] in ["upstream", "embedding_generator"]
+                continue
+            new_state_dict[k] = state_dict[k]
+        checkpoint["state_dict"] = new_state_dict
+
+        return checkpoint
