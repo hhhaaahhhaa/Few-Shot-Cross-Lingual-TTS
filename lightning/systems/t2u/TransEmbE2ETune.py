@@ -21,7 +21,8 @@ from ..language.FastSpeech2 import BaselineSystem
 from ..phoneme_recognition.loss import PRFramewiseLoss
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
-from .downstreams import Downstream1, Downstream2
+from .downstreams import Downstream1, Downstream2, LinearDownstream
+from ..language.embeddings import SoftMultiAttCodebook
 from Objects.config import LanguageDataConfigReader
 
 
@@ -54,10 +55,11 @@ class TransEmbE2ETuneSystem(System):
 
     def build_u2s(self):
         # Load tuned u2s
-        with open(self.model_config["u2s"]["model_cards"], 'r', encoding='utf-8') as f:  # "evaluation/_exp1/model.json"
+        with open(self.model_config["u2s"]["model_cards"], 'r', encoding='utf-8') as f:
             MODEL_CARDS = json.load(f)
         config_reader = LanguageDataConfigReader()
-        model_info = MODEL_CARDS[self.model_config["u2s"]["model_name"]]  # "u2s-zhkofrdees-hubert_large_ll60k-24-512c"
+        model_info = MODEL_CARDS[self.model_config["u2s"]["model_name"]]
+        self.u2s_info = model_info
 
         # Load model and data
         data_configs = [config_reader.read(path) for path in model_info["config_paths"]]  # reconstruct data config in local since data path is different
@@ -77,23 +79,22 @@ class TransEmbE2ETuneSystem(System):
         from Parsers.utils import read_queries_from_txt
         from text import text_to_sequence
 
-        print("Generate reference...")
         data_parser = Define.DATAPARSERS[data_config["name"]]
         lang_id = data_config["lang_id"]
         symbol_id = data_config["symbol_id"]
         queries = read_queries_from_txt(data_config["subsets"]["train"])
 
-        self.cuda()  # Move to GPU
-        hiddens = []
-        avg_frames_list = []
-        phonemes_list = []
-
+        infos= []
         # Extract representation information batchwise
         for query_batch in batchify(queries, batch_size=16):
             info = {
                 "raw_feat": [],
-                "max_len": [],
-                "lens": []
+                "lens": [],
+                "max_len": None,
+                "phonemes": [],
+                "avg_frames": [],
+                "lang_id": lang_id,
+                "symbol_id": symbol_id,
             }
             for query in query_batch:
                 # Transfer learning module
@@ -103,46 +104,48 @@ class TransEmbE2ETuneSystem(System):
                 else:
                     raw_feat = data_parser.wav_trim_16000.read_from_query(query)
                     avg_frames = segment2duration(segment, fp=0.02)
-                    info["raw_feat"].append(torch.from_numpy(raw_feat).float().cuda())
-                    avg_frames_list.append(avg_frames)
+                    info["raw_feat"].append(torch.from_numpy(raw_feat).float())
+                    info["avg_frames"].append(avg_frames)
                     info["lens"].append(sum(avg_frames))
 
                 phns = data_parser.phoneme.read_from_query(query)
                 phns = f"{{{phns}}}"  # match input format of text_to_sequence()
                 phns = text_to_sequence(phns, data_config["text_cleaners"], lang_id)
-                phonemes_list.append(phns)
-            info["lens"] = torch.LongTensor(info["lens"]).cuda()
+                info["phonemes"].append(phns)
+            info["lens"] = torch.LongTensor(info["lens"])
             info["max_len"] = max(info["lens"])
-
-            self.upstream.eval()
-            with torch.no_grad():
-                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
-                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())
-                x = self.embedding_generator(ssl_repr, info["lens"])
-                hiddens.extend([x1 for x1 in x])
-        print("Generate reference done.")
+            infos.append(info)
         
-        return {
-            "hiddens": hiddens,
-            "avg_frames_list": avg_frames_list,
-            "phonemes_list": phonemes_list,
-            "lang_id": lang_id,
-            "symbol_id": symbol_id,
-        }
+        return infos
 
     def tune_init(self, data_configs):
         from text.define import LANG_ID2SYMBOLS
 
         assert len(data_configs) == 1
-        ref_info = self.generate_reference_info(data_configs[0])
+        print("Generate reference...")
+        ref_infos = self.generate_reference_info(data_configs[0])
+        self.target_lang_id = ref_infos[0]["lang_id"]
+        print(f"Target Language: {self.target_lang_id}.")
 
         # Merge all information and perform embedding layer initialization
+        print("Embedding initialization...")
+        self.cuda()
+        self.upstream.eval()
         with torch.no_grad():
-            table = self.phoneme_query_extractor(ref_info["hiddens"], ref_info["avg_frames_list"], 
-                                len(LANG_ID2SYMBOLS[ref_info["lang_id"]]), ref_info["phonemes_list"])  # 1, n_symbols, dim
+            hiddens, avg_frames_list, phonemes_list = [], [], []
+            for info in ref_infos:
+                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
+                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())
+                x = self.embedding_generator(ssl_repr, info["lens"].cuda())
+                hiddens.extend([x1 for x1 in x])
+                avg_frames_list.extend(info["avg_frames"])
+                phonemes_list.extend(info["phonemes"])
+                
+            table = self.phoneme_query_extractor(hiddens, avg_frames_list, 
+                                len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
             table = table.squeeze(0)  # n_symbols, dim
             # print(table.shape)
-            self.embedding_model.tables[f"table-{ref_info['symbol_id']}"].copy_(table)
+            self.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
         for p in self.embedding_model.parameters():
             p.requires_grad = True
         self.cpu()
@@ -164,7 +167,7 @@ class TransEmbE2ETuneSystem(System):
         return loss_dict, output, alignments
 
     def common_u2s_step(self, logits, batch, batch_idx, train=True):
-        table = self.u2s.embedding_model.tables["table-zhkofrdees-hubert_large_ll60k-24-512c"]
+        table = self.u2s.embedding_model.tables[f"table-{self.u2s_info['unit_name']}"]
         emb_units = F.softmax(logits[:, :-1, :], dim=2) @ table  # B, L, d_enc, note that t2u append <eos> at the end so need to adjust the shape
         output = self.u2s.model(batch[2], emb_units, *(batch[4:]))
         loss = self.u2s_loss_func(batch[:-1], output)
@@ -370,6 +373,76 @@ class TransEmbC2E2ETuneSystem(TransEmbE2ETuneSystem):
             table = table.squeeze(0)  # n_symbols, dim
             # print(table.shape)
             self.embedding_model.tables[f"table-{ref_info['symbol_id']}"].copy_(table)
+        for p in self.embedding_model.parameters():
+            p.requires_grad = True
+        self.cpu()
+
+
+class TransEmbOrigE2ETuneSystem(TransEmbE2ETuneSystem):
+    """
+    Passed through Codebook after PhonemeQuery extraction
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_model(self):
+        t2u_model_config = self.model_config["t2u"]
+        id2symbols = build_id2symbols(self.data_configs)
+        n_units = len(id2symbols[self.data_configs[0]["target"]["unit_name"]])   # all target unit names from data configs should be the same!
+        setattr(hparams, "n_units", n_units)
+        encoder_dim = t2u_model_config["tacotron2"]["symbols_embedding_dim"]
+        self.embedding_model = MultilingualEmbedding(id2symbols, dim=encoder_dim)
+        self.model = TacoT2U(t2u_model_config)
+        self.loss_func = PRFramewiseLoss()
+
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.embedding_generator = LinearDownstream(
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            d_out=t2u_model_config["transformer"]["d_model"],
+            specific_layer=Define.LAYER_IDX
+        )
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+        self.codebook_attention = SoftMultiAttCodebook(
+            codebook_size=t2u_model_config["codebook_size"],
+            embed_dim=t2u_model_config["transformer"]["d_model"],
+            num_heads=t2u_model_config["transformer"]["nhead"],
+        )
+
+        super().build_u2s()
+
+    def tune_init(self, data_configs):
+        from text.define import LANG_ID2SYMBOLS
+
+        assert len(data_configs) == 1
+        print("Generate reference...")
+        ref_infos = self.generate_reference_info(data_configs[0])
+        self.target_lang_id = ref_infos[0]["lang_id"]
+        print(f"Target Language: {self.target_lang_id}.")
+
+        # Merge all information and perform embedding layer initialization
+        print("Embedding initialization...")
+        self.cuda()
+        self.upstream.eval()
+        with torch.no_grad():
+            hiddens, avg_frames_list, phonemes_list = [], [], []
+            for info in ref_infos:
+                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
+                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())
+                x = self.embedding_generator.weighted_sum(ssl_repr, dim=2)
+                hiddens.extend([x1 for x1 in x])
+                avg_frames_list.extend(info["avg_frames"])
+                phonemes_list.extend(info["phonemes"])
+            
+            table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
+                                len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
+            table_pre = self.embedding_generator.proj(table_pre)
+
+            table, attn = self.codebook_attention(table_pre)
+            table = table.squeeze(0)  # n_symbols, dim
+            # print(table.shape)
+            self.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
         for p in self.embedding_model.parameters():
             p.requires_grad = True
         self.cpu()

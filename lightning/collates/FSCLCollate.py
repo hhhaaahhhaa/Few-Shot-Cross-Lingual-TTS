@@ -32,10 +32,10 @@ class FSCLCollate(object):
         speakers = build_all_speakers(data_configs)
         self.speaker_map = {spk: i for i, spk in enumerate(speakers)}
 
-    def collate_fn(self, shots, queries, re_id=False):
-        return partial(self._collate_fn, shots=shots, queries=queries, re_id=re_id)
+    def collate_fn(self, shots, queries, re_id=False, query_info=False):
+        return partial(self._collate_fn, shots=shots, queries=queries, re_id=re_id, query_info=query_info)
 
-    def _collate_fn(self, data, shots, queries, re_id=False):
+    def _collate_fn(self, data, shots, queries, re_id=False, query_info=False):
         # import time
         # st = time.time()
         batch_size = shots + queries
@@ -81,7 +81,12 @@ class FSCLCollate(object):
             sup_info["avg_frames"] = [data[idx]["avg-frames"] for idx in sup_ids]
             sup_info["lens"] = torch.LongTensor([sum(data[idx]["avg-frames"]) for idx in sup_ids])
             sup_info["max_len"] = max(sup_info["lens"])
-            # calc_ref = time.time() - st1
+
+            if query_info:
+                qry_info = {}
+                qry_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in qry_ids]
+                return (sup_out, qry_out, sup_info, qry_info)
+        # calc_ref = time.time() - st1
 
         return (sup_out, qry_out, sup_info)
 

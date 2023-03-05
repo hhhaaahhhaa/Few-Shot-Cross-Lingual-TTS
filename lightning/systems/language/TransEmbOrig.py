@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from collections import OrderedDict
 
 from dlhlp_lib.s3prl import S3PRLExtractor
-from dlhlp_lib.transformers import CodebookAttention
 
 import Define
 from lightning.build import build_all_speakers
@@ -12,15 +11,13 @@ from lightning.systems.adaptor import AdaptorSystem
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.model.reduction import PhonemeQueryExtractor
 from lightning.model.old_extractor import S3PRLExtractor as OldExtractor
-from lightning.utils.tool import ssl_match_length
 from lightning.callbacks.language.baseline_saver import Saver
 from .embeddings import *
-from ..t2u.downstreams import LinearDownstream, Downstream1
 from transformer import Constants
-from .embeddings import SoftMultiAttCodebook, SoftMultiAttCodebook2
+from .embeddings import SoftMultiAttCodebook2
 
 
-class TransEmbCSystem(AdaptorSystem):  # Not done
+class TransEmbOrigSystem(AdaptorSystem): 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -39,43 +36,44 @@ class TransEmbCSystem(AdaptorSystem):  # Not done
         
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
-        self.embedding_generator = Downstream1(
-            self.model_config["downstream"],
-            n_in_layers=Define.UPSTREAM_LAYER,
-            upstream_dim=Define.UPSTREAM_DIM,
-            specific_layer=Define.LAYER_IDX
-        )
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
-        self.codebook_attention = CodebookAttention(
+        self.codebook_attention = SoftMultiAttCodebook2(
             codebook_size=self.model_config["codebook_size"],
             embed_dim=encoder_dim,
-            num_heads=self.model_config["downstream"]["nhead"],
+            num_heads=self.model_config["downstream"]["transformer"]["nhead"],
         )
-
+        print(self.codebook_attention)
+    
     def build_optimized_model(self):
-        return nn.ModuleList([self.codebook_attention, self.embedding_generator, self.model])
-
+        return nn.ModuleList([self.codebook_attention, self.model])
+        
     def build_saver(self):
         self.saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
         return self.saver
 
     def build_embedding_table(self, batch, return_attn=False):  
-        _, _, sup_info = batch[0]
+        sup_info = batch[0][2]
 
         # TODO: Mel version
         self.upstream.eval()
         with torch.no_grad():
             ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
-            ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
             ssl_repr = ssl_repr.detach()
 
-        x = self.embedding_generator(ssl_repr)
-        table_pre = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
-                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, n_layers, dim
+        # print("Check s3prl")
+        # for r in ssl_repr:
+        #     print(r[:, 24, :].sum())
+        # input()
 
-        temperature = 4
-        table, attn = self.codebook_attention(table_pre / temperature, need_weights=return_attn)
+        table_pre = self.phoneme_query_extractor(ssl_repr, sup_info["avg_frames"], 
+                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, 25, dim
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
         table = table.squeeze(0)  # n_symbols, dim
+        table[Constants.PAD].fill_(0)
+        
+        if (table_pre != table_pre).any():
+            print("NaN table")
+            assert 1 == 2
         
         # print("Table shape and gradient required: ", table.shape)
         # print(table.requires_grad)
@@ -144,10 +142,9 @@ class TransEmbCSystem(AdaptorSystem):  # Not done
 
         # visualization
         if batch_idx == 0:
-            # layer_weights = F.softmax(self.embedding_generator.weighted_sum.weight_raw, dim=0)
             layer_weights = F.softmax(self.codebook_attention.weight_raw.squeeze(0).squeeze(-1), dim=0)
             self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
-        if batch_idx in [0, 8, 16]:
+        if batch_idx % 4 == 0:
             lang_id = qry_batch[-1][0].item()  # all batch belongs to the same language
             self.saver.log_codebook_attention(self.logger, attn, lang_id, batch_idx, self.global_step + 1, "val")
 
@@ -168,11 +165,63 @@ class TransEmbCSystem(AdaptorSystem):  # Not done
 
         return checkpoint
 
+    # Enable loading checkpoints trained from the old repo
+    def on_load_checkpoint(self, checkpoint: dict) -> None:
+        self.test_global_step = checkpoint["global_step"]
+        state_dict = checkpoint["state_dict"]
+        model_state_dict = self.state_dict()
+        is_changed = False
+        state_dict_pop_keys = []
+        state_dict_remap_keys = []
+        for k in state_dict:
+            if k in model_state_dict:
+                if state_dict[k].shape != model_state_dict[k].shape:
+                    if self.local_rank == 0:
+                        print(f"Skip loading parameter: {k}, "
+                                    f"required shape: {model_state_dict[k].shape}, "
+                                    f"loaded shape: {state_dict[k].shape}")
+                    state_dict[k] = model_state_dict[k]
+                    is_changed = True
+            else:
+                if "embedding_model.hub.embeddings.soft-m." in k:
+                    k_new = k.replace("embedding_model.hub.embeddings.soft-m.", "")
+                    k_new = f"codebook_attention.{k_new}"
+                    state_dict_remap_keys.append((k_new, k))
+                
+                if self.local_rank == 0:
+                    print(f"Dropping parameter {k}")
+                state_dict_pop_keys.append(k)
+                is_changed = True
+
+        if len(state_dict_remap_keys) > 0:
+            for (k_new, k) in state_dict_remap_keys:
+                print(f"Remap parameters from old to new ({k} => {k_new}).")
+                state_dict[k_new] = state_dict[k]
+
+        # modify state_dict format to model_state_dict format
+        for k in state_dict_pop_keys:
+            state_dict.pop(k)
+        for k in model_state_dict:
+            if k not in state_dict:
+                if k.split('.')[0] in ["upstream", "embedding_generator"]:
+                    pass
+                else:
+                    print("Reinitialized: ", k)
+                state_dict[k] = model_state_dict[k]
+
+        if is_changed:
+            checkpoint.pop("optimizer_states", None)
+
+
 
 from learn2learn.algorithms import MAML
 from dlhlp_lib.utils.tool import get_mask_from_lengths
-class TransEmbOrigSystem(TransEmbCSystem):
 
+
+class TransEmbOrig2System(TransEmbOrigSystem):
+    """
+    Using MAML-like style which is closer to original style, should be identical to TransEmbOrigSystem.
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -181,63 +230,24 @@ class TransEmbOrigSystem(TransEmbCSystem):
         self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
         self.loss_func = FastSpeech2Loss(self.model_config)
         
-        self.upstream = S3PRLExtractor(Define.UPSTREAM)
-        self.upstream.freeze()
-        # self.embedding_generator = LinearDownstream(
-        #     n_in_layers=Define.UPSTREAM_LAYER,
-        #     upstream_dim=Define.UPSTREAM_DIM,
-        #     d_out=encoder_dim,
-        #     specific_layer=Define.LAYER_IDX
-        # )
-        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+        self.old_phoneme_query_extractor = OldExtractor(Define.UPSTREAM)
+        self.old_phoneme_query_extractor.freeze()
+        
         self.codebook_attention = SoftMultiAttCodebook2(
             codebook_size=self.model_config["codebook_size"],
             embed_dim=encoder_dim,
             num_heads=self.model_config["downstream"]["transformer"]["nhead"],
         )
         print(self.codebook_attention)
-        # self.codebook_attention = CodebookAttention(
-        #     codebook_size=self.model_config["codebook_size"],
-        #     embed_dim=encoder_dim,
-        #     num_heads=self.model_config["downstream"]["transformer"]["nhead"],
-        # )
-
-        # self.old_phoneme_query_extractor = OldExtractor(Define.UPSTREAM)
-        # self.old_phoneme_query_extractor.freeze()
     
     def build_optimized_model(self):
         return nn.ModuleList([self.codebook_attention, self.model])
     
     def build_embedding_table(self, batch, return_attn=False):  
         _, _, sup_info = batch[0]
-
-        # TODO: Mel version
-        self.upstream.eval()
-        with torch.no_grad():
-            ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
-            # ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
-            ssl_repr = ssl_repr.detach()
-
-        # print("Check s3prl")
-        # for r in ssl_repr:
-        #     print(r[:, 24, :].sum())
-        # input()
-
-        # This is the order of original version
-        # x = self.embedding_generator.weighted_sum(ssl_repr, dim=2)
-        table_pre = self.phoneme_query_extractor(ssl_repr, sup_info["avg_frames"], 
-                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, 25, dim
         
-        # self.old_phoneme_query_extractor.eval()
-        # table_pre = self.old_phoneme_query_extractor.extract(sup_info).to(self.device)  # 1, n_symbols, 25, dim
-
-        # print(torch.sum((table_pre - table_pre_old) ** 2))
-        # input()
-
-            
-        # table_pre = self.embedding_generator(table_pre)
-        # table_pre = self.embedding_generator.proj(table_pre)
-
+        self.old_phoneme_query_extractor.eval()
+        table_pre = self.old_phoneme_query_extractor.extract(sup_info).to(self.device)  # 1, n_symbols, 25, dim
         table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
         table = table.squeeze(0)  # n_symbols, dim
         table[Constants.PAD].fill_(0)
@@ -362,50 +372,4 @@ class TransEmbOrigSystem(TransEmbCSystem):
         )
     
     def common_step(self, batch, batch_idx, train=True):
-        return super().common_step(batch, batch_idx, train)
-        # return self.common_step_old(batch, batch_idx, train)
-
-    def on_load_checkpoint(self, checkpoint: dict) -> None:
-        self.test_global_step = checkpoint["global_step"]
-        state_dict = checkpoint["state_dict"]
-        model_state_dict = self.state_dict()
-        is_changed = False
-        state_dict_pop_keys = []
-        state_dict_remap_keys = []
-        for k in state_dict:
-            if k in model_state_dict:
-                if state_dict[k].shape != model_state_dict[k].shape:
-                    if self.local_rank == 0:
-                        print(f"Skip loading parameter: {k}, "
-                                    f"required shape: {model_state_dict[k].shape}, "
-                                    f"loaded shape: {state_dict[k].shape}")
-                    state_dict[k] = model_state_dict[k]
-                    is_changed = True
-            else:
-                if "embedding_model.hub.embeddings.soft-m." in k:
-                    k_new = k.replace("embedding_model.hub.embeddings.soft-m.", "")
-                    k_new = f"codebook_attention.{k_new}"
-                    state_dict_remap_keys.append((k_new, k))
-                
-                if self.local_rank == 0:
-                    print(f"Dropping parameter {k}")
-                state_dict_pop_keys.append(k)
-                is_changed = True
-
-        print(state_dict_remap_keys)
-        for (k_new, k) in state_dict_remap_keys:
-            state_dict[k_new] = state_dict[k]
-
-        # modify state_dict format to model_state_dict format
-        for k in state_dict_pop_keys:
-            state_dict.pop(k)
-        for k in model_state_dict:
-            if k not in state_dict:
-                if k.split('.')[0] in ["upstream", "embedding_generator"]:
-                    pass
-                else:
-                    print("Reinitialized: ", k)
-                state_dict[k] = model_state_dict[k]
-
-        if is_changed:
-            checkpoint.pop("optimizer_states", None)
+        return self.common_step_old(batch, batch_idx, train)

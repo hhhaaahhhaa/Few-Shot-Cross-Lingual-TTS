@@ -318,9 +318,18 @@ if __name__ == "__main__":
     parser.add_argument("--use_comet", action="store_true", default=False)
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--tune", action="store_true", default=False)
+    parser.add_argument("--adapart", action="store_true", default=False)
+    parser.add_argument("--nolid", action="store_true", default=False)
+    parser.add_argument("--tunet2u", action="store_true", default=False)
+    parser.add_argument("--atttemp", action="store_true", default=False)
 
     args = parser.parse_args()
     Define.DEBUG = args.debug
+    Define.ADAPART = args.adapart
+    Define.NOLID = args.nolid
+    Define.TUNET2U = args.tunet2u
+    Define.ATTTEMP = args.atttemp
+
     Define.USE_COMET = args.use_comet
     Define.LAYER_IDX = args.layer_exp
     Define.set_upstream(args.upstream_exp)

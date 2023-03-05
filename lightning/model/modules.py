@@ -38,6 +38,8 @@ class VarianceAdaptor(nn.Module):
 
         # If pitch and energy are normalized, min/max need to be normalized, too
         pitch_min, pitch_max, pitch_mean, pitch_std, energy_min, energy_max, energy_mean, energy_std = Define.ALLSTATS["global"]
+        print("Check VA global value")
+        print(Define.ALLSTATS["global"])
         if model_config["pitch"]["normalization"]:
             pitch_min = (pitch_min - pitch_mean) / pitch_std
             pitch_max = (pitch_max - pitch_mean) / pitch_std

@@ -16,7 +16,8 @@ from lightning.model.reduction import PhonemeQueryExtractor
 from ..phoneme_recognition.loss import PRFramewiseLoss
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
-from .downstreams import Downstream2
+from .downstreams import Downstream2, LinearDownstream
+from ..language.embeddings import SoftMultiAttCodebook
 
 
 class TransEmbCSystem(AdaptorSystem):
@@ -135,6 +136,9 @@ class TransEmbCSystem(AdaptorSystem):
         if batch_idx == 0:
             layer_weights = F.softmax(self.embedding_generator.weighted_sum.weight_raw, dim=0)
             self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
+        if batch_idx in [0, 8, 16]:
+            lang_id = qry_batch[9][0].item()  # all batch belongs to the same language
+            self.saver.log_codebook_attention(self.logger, attn, lang_id, batch_idx, self.global_step + 1, "val")
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
@@ -192,6 +196,66 @@ class TransEmbCSystem(AdaptorSystem):
             output = self.model.inference(emb_texts, None, None)
 
         return output
+
+
+class TransEmbOrigSystem(TransEmbCSystem):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def build_model(self):
+        encoder_dim = self.model_config["tacotron2"]["symbols_embedding_dim"]
+        id2symbols = build_id2symbols(self.data_configs)
+        n_units = len(id2symbols[self.data_configs[0]["target"]["unit_name"]])   # all target unit names from data configs should be the same!
+        setattr(hparams, "n_units", n_units)
+        self.model = TacoT2U(self.model_config)
+        self.loss_func = PRFramewiseLoss()
+
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.embedding_generator = LinearDownstream(
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            d_out=encoder_dim,
+            specific_layer=Define.LAYER_IDX
+        )
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
+        self.codebook_attention = SoftMultiAttCodebook(
+            codebook_size=self.model_config["codebook_size"],
+            embed_dim=self.model_config["transformer"]["d_model"],
+            num_heads=self.model_config["transformer"]["nhead"],
+        )
+        
+    def build_embedding_table(self, batch, return_attn=False):  
+        _, _, sup_info = batch[0]
+
+        # TODO: Mel version
+        self.upstream.eval()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
+            ssl_repr = ssl_repr.detach()
+
+        # This is the order of original version
+        x = self.embedding_generator.weighted_sum(ssl_repr, dim=2)
+        table_pre = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
+                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, dim
+        table_pre = self.embedding_generator.proj(table_pre)
+
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        table = table.squeeze(0)  # n_symbols, dim
+        table[0].fill_(0)
+        
+        # print("Table shape and gradient required: ", table.shape)
+        # print(table.requires_grad)
+        
+        if return_attn:
+            return table, attn
+        else:
+            return table
+        
+    def build_optimized_model(self):
+        return nn.ModuleList([self.codebook_attention, self.embedding_generator, self.model])
 
 
 def schedule_f(step: int) -> float:

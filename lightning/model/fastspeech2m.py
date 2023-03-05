@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 from dlhlp_lib.audio import AUDIO_CONFIG
 from dlhlp_lib.utils.tool import get_mask_from_lengths
 
+import Define
 from transformer import Decoder, PostNet, Encoder2
 from .modules import VarianceAdaptor
 from .speaker_encoder import SpeakerEncoder, LanguageEncoder
@@ -62,6 +63,9 @@ class FastSpeech2(pl.LightningModule):
         d_control=1.0,
         average_spk_emb=False,
     ):
+        # print("Ch1-1")
+        # print(e_targets, e_targets.sum(-1))
+        
         src_masks = get_mask_from_lengths(src_lens, max_src_len).to(self.device)
         mel_masks = (
             get_mask_from_lengths(mel_lens, max_mel_len).to(self.device)
@@ -74,6 +78,9 @@ class FastSpeech2(pl.LightningModule):
         output = self.encoder(texts, src_masks)
         # print("FastSpeech2m encoder output shape: ", output.shape)
 
+        # print("Check encoder output")
+        # print(output.sum(-1))
+
         if self.speaker_emb is not None:
             spk_emb = self.speaker_emb(speaker_args)
             # print("FastSpeech2m spk_emb shape: ", spk_emb.shape)
@@ -83,9 +90,15 @@ class FastSpeech2(pl.LightningModule):
             # output = output + self.speaker_emb(speaker_args).unsqueeze(1).expand(
             #     -1, max_src_len, -1
             # )
-        if self.language_emb is not None and lang_args is not None:
-            lang_emb = self.language_emb(lang_args)
-            output += lang_emb.unsqueeze(1).expand(-1, max_src_len, -1)
+
+        # print("Check add spkemb output")
+        # print(output.sum(-1))
+        # input()
+
+        if not Define.NOLID:  # Hacking
+            if self.language_emb is not None and lang_args is not None:
+                lang_emb = self.language_emb(lang_args)
+                output += lang_emb.unsqueeze(1).expand(-1, max_src_len, -1)
 
         (
             output,
@@ -107,6 +120,13 @@ class FastSpeech2(pl.LightningModule):
             e_control,
             d_control,
         )
+
+        # print("Check va output")
+        # print(output.sum(-1))
+        # print(p_predictions.sum())
+        # print(e_predictions.sum())
+        # input()
+
         # print("FastSpeech2m variance adaptor output shape: ", output.shape)
 
         if self.speaker_emb is not None:
@@ -123,6 +143,11 @@ class FastSpeech2(pl.LightningModule):
         output = self.mel_linear(output)
 
         postnet_output = self.postnet(output) + output
+
+        # print("Check decoder output")
+        # print(output.sum())
+        # print(postnet_output.sum())
+        # input()
 
         return (
             output,

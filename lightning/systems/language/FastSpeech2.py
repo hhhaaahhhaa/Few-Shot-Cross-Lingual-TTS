@@ -47,8 +47,8 @@ class BaselineSystem(System):
         return nn.ModuleList([self.model, self.embedding_model])
     
     def build_saver(self):
-        saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
-        return saver
+        self.saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
+        return self.saver
 
     def common_step(self, batch, batch_idx, train=True):
         emb_texts = self.embedding_model(batch[3])

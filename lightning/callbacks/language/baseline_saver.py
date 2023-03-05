@@ -113,7 +113,7 @@ class Saver(BaseSaver):
 
         # Log figure/audio to logger + save audio
         # One smaple for the first two batches, so synthesize two samples in total.
-        if batch_idx == 0 and pl_module.local_rank == 0:
+        if batch_idx < 2 and pl_module.local_rank == 0:
             metadata = {'ids': batch[0]}
             fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
                 _batch, output, self.vocoder, self.model_config
