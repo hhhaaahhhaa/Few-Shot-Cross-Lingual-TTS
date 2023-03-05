@@ -53,7 +53,11 @@ SYSTEM_T2U = {
 }
 
 
-SYSTEM = SYSTEM_SYNTHESIS + SYSTEM_T2U
+SYSTEM = {
+    **SYSTEM_SYNTHESIS,
+    # **SYSTEM_PR,
+    **SYSTEM_T2U
+}
 
 
 def get_system(algorithm) -> Type[System]:
