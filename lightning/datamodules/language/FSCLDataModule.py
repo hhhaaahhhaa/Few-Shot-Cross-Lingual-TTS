@@ -40,6 +40,8 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.meta_batch_size = self.algorithm_config["adapt"]["train"]["meta_batch_size"]
 
+        self.return_qry_info = False  # Only true when ssl ada
+
     def setup(self, stage=None):
         spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
                      in ["dvec", "encoder", "scratch_encoder"])
@@ -77,13 +79,15 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.train_task_dataset = few_shot_task_dataset(
             self.train_dataset, self.train_ways, self.train_shots, self.train_queries,
-            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
+            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs),
+            re_id=False, query_info=self.return_qry_info
         )
 
     def _validation_setup(self):
         self.val_task_dataset = few_shot_task_dataset(
             self.val_dataset, self.test_ways, self.test_shots, self.test_queries,
-            n_tasks_per_label=4, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
+            n_tasks_per_label=4, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs),
+            re_id=False, query_info=self.return_qry_info
         )
         with seed_all(43):
             self.val_SQids2Tid = prefetch_tasks(self.val_task_dataset, 'val', self.log_dir)

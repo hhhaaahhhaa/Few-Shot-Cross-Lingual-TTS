@@ -6,7 +6,6 @@ import pytorch_lightning as pl
 from dlhlp_lib.audio import AUDIO_CONFIG
 from dlhlp_lib.utils.tool import get_mask_from_lengths
 
-import Define
 from lightning.model import FastSpeech2ADALoss, ADAEncoder
 
 

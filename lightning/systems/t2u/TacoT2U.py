@@ -1,9 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import jiwer
 
-import Define
 from lightning.build import build_id2symbols
 from lightning.systems.system import System
 from lightning.callbacks.t2u.saver import Saver
@@ -11,6 +9,7 @@ from ..phoneme_recognition.loss import PRFramewiseLoss
 from ..language.embeddings import MultilingualEmbedding
 from .tacotron2.tacot2u import TacoT2U
 from .tacotron2.hparams import hparams
+from .schedules import no_schedule as schedule_f
 
 
 class TacoT2USystem(System):
@@ -31,8 +30,8 @@ class TacoT2USystem(System):
         return nn.ModuleList([self.embedding_model, self.model])
 
     def build_saver(self):
-        saver = Saver(self.data_configs, self.log_dir, self.result_dir)
-        return saver
+        self.saver = Saver(self.data_configs, self.log_dir, self.result_dir)
+        return self.saver
 
     def common_step(self, batch, batch_idx, train=True):
         emb_texts = self.embedding_model(batch[3])
@@ -137,10 +136,3 @@ class TacoT2USystem(System):
             output = self.model.inference(emb_texts, None, None)
 
         return output
-
-
-def schedule_f(step: int) -> float:
-    return 1.0
-    # return max(0.5, 1 - step / 20000)
-    # else:
-    #     return max(0, 0.5 - (step - 20000) / 20000)
