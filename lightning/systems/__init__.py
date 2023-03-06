@@ -13,6 +13,8 @@ SYSTEM_SYNTHESIS = {
 
     "fscl-orig": language.TransEmbOrigSystem,
     "fscl-orig-tune": language.TransEmbOrigTuneSystem,
+    "fscl-linear": language.TransEmbLinearSystem,
+    # "fscl-linear-tune": language.TransEmbLinearTuneSystem,
     "fscl-ada1": language.ada_class_factory(language.TransEmbOrigSystem, ada_stage="matching"),
     "fscl-ada2": language.ada_class_factory(language.TransEmbOrigSystem, ada_stage="unsup_tuning"),
     "fscl-ssl_ada1": language.ssl_ada_class_factory(language.TransEmbOrigSystem, ada_stage="matching"),

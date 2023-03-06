@@ -47,17 +47,16 @@ class SoftMultiAttCodebook(nn.Module):
         # att(feats, att_banks) -> token_id weights -> emb_banks
         self.att_banks = nn.Parameter(torch.randn(self.codebook_size, self.d_word_vec))
 
-        if Define.ATTTEMP:
-            self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
-        else:
-            self.attention = MultiheadAttention(temperature=1.0)
+        self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
 
-    def forward(self, query, need_weights=False):
+    def forward(self, ref, need_weights=False):
         """
-        query: Tensor with size (B, L, dim).
+        ref: Tensor with size (B, L, representation_dim) or (1, vocab_size, representation_dim).
         """
-        B = query.size(0)
-        q = query.view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
+        ref[ref != ref] = 0
+        B = ref.shape[0]
+
+        q = ref.view(B, -1, self.num_heads, self.d_word_vec // self.num_heads)
         q = q.transpose(1, 2).contiguous()  # 1 x nH x vocab_size x dword // nH
         k = self.att_banks.view(-1, self.num_heads, self.d_word_vec // self.num_heads)
         k = k.transpose(0, 1).unsqueeze(0).contiguous()  # 1 x nH x codebook_size x dword // nH
@@ -91,13 +90,13 @@ class SoftMultiAttCodebook2(nn.Module):
         self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
 
         if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None and Define.LAYER_IDX is not None:
-            self.weight_raw = nn.Parameter(torch.zeros(1, 25, 1))
+            self.weight_raw = nn.Parameter(torch.ones(1, Define.UPSTREAM_LAYER, 1))
             
-            # normalize code debug
-            last_hidden = torch.ones(1, 25, 1) * float('-inf')
-            last_hidden[0][Define.LAYER_IDX][0] = 10.0
-            self.weight_raw = nn.Parameter(last_hidden)
-            self.weight_raw.requires_grad = False
+            if Define.LAYER_IDX is not None:
+                # normalize code debug
+                self.weight_raw = self.weight_raw * float('-inf')
+                self.weight_raw[0][Define.LAYER_IDX][0] = 10.0
+                self.weight_raw.requires_grad = False
 
         self.q_linear = nn.Linear(Define.UPSTREAM_DIM, self.d_word_vec)
 
