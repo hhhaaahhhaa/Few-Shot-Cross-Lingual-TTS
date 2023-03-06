@@ -3,10 +3,10 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
-from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, SSLUnitFSCLDataset, SSLUnitPseudoLabelDataset, TextDataset, few_shot_task_dataset
+from lightning.datasets.language import FSCLDataset, UnsupFSCLDataset, UnitFSCLDataset, TextDataset, few_shot_task_dataset
 from lightning.utils.tool import seed_all
 from ..utils import prefetch_tasks, EpisodicInfiniteWrapper
-from lightning.collates import GeneralFSCLCollate
+from lightning.collates import GeneralFSCLCollate, FSCLCollate
 from .FastSpeech2DataModule import FastSpeech2DataModule, FastSpeech2TuneDataModule
 
 
@@ -16,9 +16,10 @@ class FSCLDataModule(pl.LightningDataModule):
     Val: FSCLDataset + FSCLCollate.
     Test: TextDataset.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 
@@ -38,6 +39,8 @@ class FSCLDataModule(pl.LightningDataModule):
         self.test_queries = self.algorithm_config["adapt"]["test"]["queries"]
 
         self.meta_batch_size = self.algorithm_config["adapt"]["train"]["meta_batch_size"]
+
+        self.return_qry_info = False  # Only true when ssl ada
 
     def setup(self, stage=None):
         spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
@@ -76,13 +79,15 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.train_task_dataset = few_shot_task_dataset(
             self.train_dataset, self.train_ways, self.train_shots, self.train_queries,
-            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type
+            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs),
+            re_id=False, query_info=self.return_qry_info
         )
 
     def _validation_setup(self):
         self.val_task_dataset = few_shot_task_dataset(
             self.val_dataset, self.test_ways, self.test_shots, self.test_queries,
-            n_tasks_per_label=4, type=self.meta_type
+            n_tasks_per_label=4, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs),
+            re_id=False, query_info=self.return_qry_info
         )
         with seed_all(43):
             self.val_SQids2Tid = prefetch_tasks(self.val_task_dataset, 'val', self.log_dir)
@@ -132,13 +137,14 @@ class FSCLDataModule(pl.LightningDataModule):
 
 class SupFSCLDataModule(pl.LightningDataModule):
     """
-    Train: FSCLDataset / SSLUnitFSCLDataset + GeneralFSCLCollate (sup).
-    Val: FSCLDataset / SSLUnitFSCLDataset + GeneralFSCLCollate (sup).
+    Train: FSCLDataset / UnitFSCLDataset + GeneralFSCLCollate (sup).
+    Val: FSCLDataset / UnitFSCLDataset + GeneralFSCLCollate (sup).
     Test: None.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 
@@ -216,9 +222,10 @@ class UnsupFSCLDataModule(pl.LightningDataModule):
     Val: UnsupFSCLDataset + GeneralFSCLCollate (unsup).
     Test: None.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 
@@ -294,11 +301,11 @@ class SemiFSCLDataModule(pl.LightningDataModule):
     Concat FSCL/UnsupFSCL datamodule. Contains one batch from both datamodules.
     Currently can not use this dataset in test/predict stage.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
-        self.sup_datamodule = FSCLDataModule(data_configs, 
+        self.sup_datamodule = FSCLDataModule(data_configs, model_config,
                                                 train_config, algorithm_config, log_dir, result_dir)
-        self.unsup_datamodule = UnsupFSCLDataModule(data_configs, 
+        self.unsup_datamodule = UnsupFSCLDataModule(data_configs, model_config,
                                                 train_config, algorithm_config, log_dir, result_dir)
 
     def setup(self, stage=None):
@@ -324,24 +331,21 @@ class SemiFSCLTuneDataModule(pl.LightningDataModule):
     Concat FastSpeech2/UnsupFSCL datamodule. Contains one batch from both datamodules.
     Currently can not use this dataset in test/predict stage.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
-        self.sup_datamodule = FastSpeech2TuneDataModule(data_configs["sup"], 
+        self.sup_datamodule = FastSpeech2TuneDataModule(data_configs["sup"], model_config,
                                                 train_config, algorithm_config, log_dir, result_dir)
-        # self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], 
+        # self.unsup_datamodule = UnsupFSCLDataModule(data_configs["unsup"], model_config,
         #                                         train_config, algorithm_config, log_dir, result_dir)
         
         # Oracle
-        # self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
+        # self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], model_config,
         #                                         train_config, algorithm_config, log_dir, result_dir, dataset_cls=FSCLDataset)
 
-        # SSL Units
-        # self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
-        #                                         train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitFSCLDataset)
+        # Units
+        self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], model_config,
+                                                train_config, algorithm_config, log_dir, result_dir, dataset_cls=UnitFSCLDataset)
         
-        # SSL Units but mapped to phonemes
-        self.unsup_datamodule = SupFSCLDataModule(data_configs["unsup"], 
-                                                train_config, algorithm_config, log_dir, result_dir, dataset_cls=SSLUnitPseudoLabelDataset)
 
     def setup(self, stage=None):
         self.sup_datamodule.setup(stage)

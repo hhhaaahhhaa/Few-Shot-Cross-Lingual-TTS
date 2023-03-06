@@ -11,7 +11,7 @@ from dlhlp_lib.parsers.preprocess import *
 import Define
 from text.define import LANG_ID2SYMBOLS
 from lightning.systems import get_system
-from lightning.utils.tool import read_queries_from_txt
+from Parsers.utils import read_queries_from_txt
 from Parsers.parser import DataParser
 from Objects.config import LanguageDataConfigReader
 

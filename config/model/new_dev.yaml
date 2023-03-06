@@ -28,5 +28,5 @@ codebook_size: 30
 representation_dim: 1024
 
 vocoder:
-  model: "MelGAN"
+  model: "HifiGAN"
   speaker: "universal" # support  'LJSpeech', 'universal'

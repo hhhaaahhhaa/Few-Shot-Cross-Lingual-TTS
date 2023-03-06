@@ -11,7 +11,7 @@ from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.loggers.base import merge_dicts
 from pytorch_lightning.utilities import rank_zero_only
 
-from Define import USE_COMET
+import Define
 from lightning.utils.log import synth_one_sample_with_target, loss2dict
 
 
@@ -42,7 +42,7 @@ class Saver(Callback):
         output = outputs['output']
         _batch = outputs['_batch']  # batch or qry_batch
         step = pl_module.global_step+1
-        if USE_COMET:
+        if Define.USE_COMET:
             if isinstance(pl_module.logger, list):
                 assert len(list(pl_module.logger)) == 1
                 logger = pl_module.logger[0]
@@ -51,7 +51,7 @@ class Saver(Callback):
         vocoder = pl_module.vocoder
 
         # Synthesis one sample and log to CometLogger
-        if USE_COMET:
+        if Define.USE_COMET:
             if step % pl_module.train_config["step"]["synth_step"] == 0 and pl_module.local_rank == 0:
                 if isinstance(batch, dict):
                     metadata = {'sup_ids': batch["sup"][0][0][0][0]}
@@ -88,7 +88,7 @@ class Saver(Callback):
         _batch = outputs['_batch']  # batch or qry_batch
         
         step = pl_module.global_step+1
-        if USE_COMET:
+        if Define.USE_COMET:
             if isinstance(pl_module.logger, list):
                 assert len(list(pl_module.logger)) == 1
                 logger = pl_module.logger[0]
@@ -111,7 +111,7 @@ class Saver(Callback):
         self.log_csv("Validation", step, task_id, loss_dict)
 
         # Log figure/audio to logger + save audio
-        if USE_COMET:
+        if Define.USE_COMET:
             if batch_idx == 0 and pl_module.local_rank == 0:
                 metadata = {'sup_ids': sup_ids}
                 fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(

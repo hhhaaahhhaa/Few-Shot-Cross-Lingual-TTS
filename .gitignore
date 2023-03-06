@@ -131,7 +131,7 @@ dmypy.json
 # other
 .comet.config
 lightning_logs/
-/_*/
+_*/
 /results/
 output/
 other/
@@ -143,3 +143,4 @@ preprocessed_data/*/
 *.csv
 *.swp
 *.sh
+*.zip

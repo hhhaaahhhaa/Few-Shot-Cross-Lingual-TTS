@@ -5,11 +5,11 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
-from text.define import LANG_ID2SYMBOLS
+from lightning.build import build_id2symbols
 from lightning.systems.system import System
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.utils.tool import ssl_match_length
-from .modules import PRFramewiseLoss
+from .loss import PRFramewiseLoss
 from .downstreams import *
 from .heads import *
 from .SSLBaseline import training_step_template, validation_step_template
@@ -32,7 +32,8 @@ class SSLBaselineTuneSystem(System):
             upstream_dim=Define.UPSTREAM_DIM,
             specific_layer=Define.LAYER_IDX
         )
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
+        self.head = MultilingualPRHead(
+            build_id2symbols(self.data_configs), d_in=self.model_config["transformer"]["d_model"])
         
         self.loss_func = PRFramewiseLoss()
 
@@ -64,7 +65,7 @@ class SSLBaselineTuneSystem(System):
         x = self.downstream(ssl_repr, labels[4].cpu())
        
         output = self.head(x, lang_id=repr_info["lang_id"])
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
         loss_dict = {
             "Total Loss": loss,
         }
@@ -89,4 +90,5 @@ class SSLClusterTuneSystem(SSLBaselineTuneSystem):
     
     def build_model(self):
         super().build_model()
-        self.head = MultilingualClusterHead(LANG_ID2SYMBOLS, self.model_config["transformer"]["d_model"])
+        self.head = MultilingualClusterHead(
+            build_id2symbols(self.data_configs), self.model_config["transformer"]["d_model"])

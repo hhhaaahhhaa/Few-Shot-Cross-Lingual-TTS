@@ -1,22 +1,28 @@
 import numpy as np
 from functools import partial
 
-from text.define import LANG_ID2SYMBOLS
+from lightning.build import build_id2symbols, build_all_speakers
 from .utils import reprocess
 
 
 class TextCollate(object):
     """
     Inference dataset only have text and target speaker information.
+    Require a map from symbol_id to symbols for re-id for multilingual-batch inference.
     """
-    def __init__(self):
+    def __init__(self, data_configs):
         # calculate re-id increment
+        id2symbols = build_id2symbols(data_configs)
         increment = 0
         self.re_id_increment = {}
-        for k, v in LANG_ID2SYMBOLS.items():
+        for k, v in id2symbols.items():
             self.re_id_increment[k] = increment
             increment += len(v)
         self.n_symbols = increment
+
+        # calculate speaker map
+        speakers = build_all_speakers(data_configs)
+        self.speaker_map = {spk: i for i, spk in enumerate(speakers)}
 
     def collate_fn(self, sort=False, re_id=True):
         return partial(self._collate_fn, sort=sort, re_id=re_id)

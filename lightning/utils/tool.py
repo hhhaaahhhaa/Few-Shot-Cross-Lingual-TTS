@@ -10,18 +10,11 @@ import matplotlib
 from matplotlib import pyplot as plt
 matplotlib.use("Agg")
 
-from Parsers.parser import DataParser
-from text import text_to_sequence
-from text.define import LANG_ID2SYMBOLS
+from dlhlp_lib.utils import batchify, segment2duration
+
 import Define
-
-
-def numpy_exist_nan(x: np.array):
-    return np.any(np.isnan(x))
-
-
-def torch_exist_nan(x: torch.Tensor):
-    return (x != x).any()
+from Parsers.utils import read_queries_from_txt
+from text import text_to_sequence
 
 
 class LightningMelGAN(pl.LightningModule):
@@ -67,15 +60,18 @@ def seed_all(seed=None, devices=None):
     np.random.set_state(nstate)
 
 
-def get_mask_from_lengths(lengths, max_len=None):
-    batch_size = lengths.shape[0]
-    if max_len is None:
-        max_len = torch.max(lengths).item()
+# def get_mask_from_lengths(lengths, max_len=None, pad_to_multiple=1):
+#     batch_size = lengths.shape[0]
+#     if max_len is None:
+#         max_len = torch.max(lengths).item()
+#     if max_len % pad_to_multiple != 0:
+#         max_len += pad_to_multiple - max_len % pad_to_multiple
+#         assert max_len % pad_to_multiple == 0
 
-    ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).to(Define.DEVICE)
-    mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
+#     ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).to(Define.DEVICE)
+#     mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
 
-    return mask
+#     return mask
 
 
 def expand(values, durations):
@@ -89,9 +85,7 @@ def plot_mel(data, stats, titles):
     fig, axes = plt.subplots(len(data), 1, squeeze=False)
     if titles is None:
         titles = [None for i in range(len(data))]
-    pitch_min, pitch_max, pitch_mean, pitch_std, energy_min, energy_max = stats
-    pitch_min = pitch_min * pitch_std + pitch_mean
-    pitch_max = pitch_max * pitch_std + pitch_mean
+    pitch_min, pitch_max, _, _, energy_min, energy_max, _, _ = stats
 
     def add_axis(fig, old_ax):
         ax = fig.add_axes(old_ax.get_position(), anchor="W")
@@ -101,7 +95,6 @@ def plot_mel(data, stats, titles):
     fig.subplots_adjust(hspace=0.3)
     for i in range(len(data)):
         mel, pitch, energy = data[i]
-        pitch = pitch * pitch_std + pitch_mean
         axes[i][0].imshow(mel, origin="lower")
         axes[i][0].set_aspect(2.5, adjustable="box")
         axes[i][0].set_ylim(0, mel.shape[0])
@@ -193,75 +186,59 @@ def pad(input_ele, mel_max_length=None):
     return out_padded
 
 
-def read_queries_from_txt(path):
-    res = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            if line == '\n':
-                continue
-            n, s, t, r = line.strip("\n").split("|")
-            res.append({
-                "basename": n,
-                "spk": s,
-            })
-    return res
-
-
-def write_queries_to_txt(data_parser: DataParser, queries, path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    data_parser.phoneme.read_all()
-    data_parser.text.read_all()
-    lines = []
-    for query in queries:
-        line = [query["basename"], query["spk"]]
-        line.append(f"{{{data_parser.phoneme.read_from_query(query)}}}")
-        line.append(data_parser.text.read_from_query(query))
-        lines.append(line)
-    with open(path, "w", encoding="utf-8") as f:
-        for line in lines:
-            f.write("|".join(line))
-            f.write('\n')
-
-
-def generate_reference(path, data_parser: DataParser, lang_id):
+def generate_reference_info(data_config, batch_size=16):
     """
-    Generate information similar to those from dataloader, which are inputs of refernece extractors.
+    Generate reference information from data_config directly, mainly used when tuning.
+    Returns a list, which is reference information for each batch.
+    Information format:
+        {
+            "raw_feat": [],
+            "lens": [],
+            "max_len": None,
+            "phonemes": [],
+            "avg_frames": [],
+            "lang_id": lang_id,
+            "symbol_id": symbol_id,
+        }
     """
-    info = {
-        "lang_id": lang_id,
-        "n_symbols": len(LANG_ID2SYMBOLS[lang_id]),
-        "avg-frames": [],
-        "raw-feat": [],
-        "phonemes": [],
-    }
-    queries = read_queries_from_txt(path)[:64]
-    for query in tqdm(queries):
-        if Define.UPSTREAM == "mel":
-            duration = data_parser.mfa_duration.read_from_query(query)
-            info["avg-frames"].append(duration)
-            mel = data_parser.mel.read_from_query(query)
-            info["raw-feat"].append(torch.from_numpy(mel).float())
-        else:
-            ssl_wav = data_parser.wav_trim_16000.read_from_query(query)
-            info["raw-feat"].append(torch.from_numpy(ssl_wav).float())
-            mfa_segment = data_parser.mfa_segment.read_from_query(query)
+    data_parser = Define.DATAPARSERS[data_config["name"]]
+    lang_id = data_config["lang_id"]
+    symbol_id = data_config["symbol_id"]
+    queries = read_queries_from_txt(data_config["subsets"]["train"])
 
-            avg_frames_16000 = []
-            for (s, e) in mfa_segment:
-                avg_frames_16000.append(
-                    int(
-                        np.round(e * 50)  # All ssl model use 20ms window
-                        - np.round(s * 50)
-                    )
-                )
-            info["avg-frames"].append(avg_frames_16000)
+    infos = []
+    # Extract representation information batchwise
+    for query_batch in batchify(queries, batch_size=batch_size):
+        info = {
+            "raw_feat": [],
+            "lens": [],
+            "max_len": None,
+            "phonemes": [],
+            "avg_frames": [],
+            "lang_id": lang_id,
+            "symbol_id": symbol_id,
+        }
+        for query in query_batch:
+            # Transfer learning module
+            segment = data_parser.mfa_segment.read_from_query(query)
+            if Define.UPSTREAM == "mel":
+                pass  # TODO: Mel version
+            else:
+                raw_feat = data_parser.wav_trim_16000.read_from_query(query)
+                avg_frames = segment2duration(segment, fp=0.02)
+                info["raw_feat"].append(torch.from_numpy(raw_feat).float())
+                info["avg_frames"].append(avg_frames)
+                info["lens"].append(sum(avg_frames))
 
-        phns = data_parser.phoneme.read_from_query(query)
-        phns = f"{{{phns}}}"  # match input format of text_to_sequence()
-        phone = np.array(text_to_sequence(phns, ["basic_cleaners"], lang_id))
-        info["phonemes"].append(phone)
-
-    return info
+            phns = data_parser.phoneme.read_from_query(query)
+            phns = f"{{{phns}}}"  # match input format of text_to_sequence()
+            phns = text_to_sequence(phns, data_config["text_cleaners"], lang_id)
+            info["phonemes"].append(phns)
+        info["lens"] = torch.LongTensor(info["lens"])
+        info["max_len"] = max(info["lens"])
+        infos.append(info)
+    
+    return infos
 
 
 # Origin Author: Daniel Lin

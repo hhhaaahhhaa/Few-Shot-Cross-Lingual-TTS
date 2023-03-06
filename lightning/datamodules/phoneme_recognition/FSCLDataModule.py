@@ -16,9 +16,10 @@ class FSCLDataModule(pl.LightningDataModule):
     Val: FSCLDataset + FSCLCollate.
     Test: TextDataset.
     """
-    def __init__(self, data_configs, train_config, algorithm_config, log_dir, result_dir):
+    def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
+        self.model_config = model_config
         self.train_config = train_config
         self.algorithm_config = algorithm_config
 
@@ -73,13 +74,13 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.train_task_dataset = few_shot_task_dataset(
             self.train_dataset, self.train_ways, self.train_shots, self.train_queries,
-            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate
+            n_tasks_per_label=-1, epoch_length=epoch_length, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
         )
 
     def _validation_setup(self):
         self.val_task_dataset = few_shot_task_dataset(
             self.val_dataset, self.test_ways, self.test_shots, self.test_queries,
-            n_tasks_per_label=8, type=self.meta_type, collate_cls=FSCLCollate
+            n_tasks_per_label=8, type=self.meta_type, collate_cls=FSCLCollate(self.data_configs)
         )
         with seed_all(43):
             self.val_SQids2Tid = prefetch_tasks(self.val_task_dataset, 'val', self.log_dir)

@@ -9,7 +9,7 @@ from typing import List, Dict
 from tqdm import tqdm
 import yaml
 
-from lightning.utils.tool import read_queries_from_txt, write_queries_to_txt
+from Parsers.utils import read_queries_from_txt, write_queries_to_txt
 from Parsers.parser import DataParser
 
 
@@ -107,7 +107,7 @@ class TaskGenerator(object):
         template = {
             "dataset": self.dataset_name,
             "lang_id": self.lang_id,
-            "preprocessed_path": self.data_parser.root,
+            "data_dir": self.data_parser.root,
             "subsets": {
                 "train": "train.txt",
                 "val": "val.txt",
@@ -119,19 +119,37 @@ class TaskGenerator(object):
 
 if __name__ == "__main__":
     random.seed(666)
-    # generator = TaskGenerator("kss", "preprocessed_data/kss", lang_id=8)
-    # generator.generate(
-    #     src_txt_path="_data/kss/val.txt",
-    #     output_dir="_data/kss/few-shot",
-    #     shots=[4, 8, 16, 32, 64, 128],
-    #     n_qry=64,
-    #     n_tasks=20
-    # )
+    generator = TaskGenerator("kss", "preprocessed_data/kss", lang_id="ko")
+    generator.generate(
+        src_txt_path="_data/kss/val.txt",
+        output_dir="_data/kss/few-shot",
+        shots=[4, 8, 16, 32, 64, 128],
+        n_qry=64,
+        n_tasks=20
+    )
 
-    generator = TaskGenerator("JSUT", "preprocessed_data/JSUT", lang_id=6)
+    generator = TaskGenerator("JSUT", "preprocessed_data/JSUT", lang_id="jp")
     generator.generate(
         src_txt_path="_data/JSUT/val.txt",
         output_dir="_data/JSUT/few-shot",
+        shots=[4, 8, 16, 32, 64, 128],
+        n_qry=64,
+        n_tasks=20
+    )
+
+    generator = TaskGenerator("CSS10-german", "preprocessed_data/CSS10/german", lang_id="de")
+    generator.generate(
+        src_txt_path="_data/CSS10/german/val.txt",
+        output_dir="_data/CSS10/german/few-shot",
+        shots=[4, 8, 16, 32, 64, 128],
+        n_qry=64,
+        n_tasks=20
+    )
+
+    generator = TaskGenerator("CSS10-spanish", "preprocessed_data/CSS10/spanish", lang_id="es")
+    generator.generate(
+        src_txt_path="_data/CSS10/spanish/val.txt",
+        output_dir="_data/CSS10/spanish/few-shot",
         shots=[4, 8, 16, 32, 64, 128],
         n_qry=64,
         n_tasks=20

@@ -6,16 +6,16 @@ import pytorch_lightning as pl
 import scipy
 from tqdm import tqdm
 import pickle
+import json
 import gc
 
 from dlhlp_lib.algorithm.dpdp import DPDPDecoder
-from dlhlp_lib.parsers.preprocess import *
 from dlhlp_lib.utils.numeric import torch_exist_nan
 
 import Define
 from text.define import LANG_ID2SYMBOLS
 from lightning.systems import get_system
-from lightning.utils.tool import read_queries_from_txt
+from Parsers.utils import read_queries_from_txt
 from Parsers.parser import DataParser
 from Objects.config import LanguageDataConfigReader
 

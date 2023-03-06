@@ -1,7 +1,7 @@
-from .SSLLinear import SSLLinearTuneSystem
+from .SSLLinear import SSLLinearSystem
 from .SSLBaseline import SSLBaselineSystem, SSLClusterSystem
 from .SSLBaselineTune import SSLBaselineTuneSystem, SSLClusterTuneSystem
-from .SSLCodebookCluster import SSLCodebookClusterSystem
-from .TransHead import TransHeadSystem
-from .TransHeadTune import TransHeadTuneSystem
+# from .SSLCodebookCluster import SSLCodebookClusterSystem
+# from .TransHead import TransHeadSystem
+# from .TransHeadTune import TransHeadTuneSystem
 from .SSLProtoNet import SSLProtoNetSystem

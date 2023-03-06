@@ -1,126 +1,129 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
+from collections import OrderedDict
 
-from lightning.systems.adaptor import AdaptorSystem
-from lightning.utils.log import loss2dict
-from lightning.utils.tool import LightningMelGAN
-from lightning.model.phoneme_embedding import PhonemeEmbedding
-from lightning.model import FastSpeech2Loss, FastSpeech2
-from lightning.model import get_reference_extractor_cls
-from lightning.callbacks.language.fscl_saver import Saver
-from Objects.visualization import CodebookAnalyzer
+from dlhlp_lib.s3prl import S3PRLExtractor
+
 import Define
-from transformer import Constants
+from lightning.build import build_all_speakers
+from lightning.systems.adaptor import AdaptorSystem
+from lightning.model import FastSpeech2Loss, FastSpeech2
+from lightning.model.reduction import PhonemeQueryExtractor
+from lightning.utils.tool import ssl_match_length
+from lightning.callbacks.language.baseline_saver import Saver
+from .embeddings import *
+from ..t2u.downstreams import Downstream1
 
 
 class TransEmbSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.init_codebook_type()
-
-        # tests
-        self.codebook_analyzer = CodebookAnalyzer(self.result_dir)
-        # self.test_list = {
-        #     "codebook visualization": self.visualize_matching,
-        # }
-
+    
+    def build_configs(self):
+        self.spk_config = {
+            "emb_type": self.model_config["speaker_emb"],
+            "speakers": build_all_speakers(self.data_configs)
+        }
+        self.bs = self.train_config["optimizer"]["batch_size"]
+    
     def build_model(self):
-        self.embedding_model = PhonemeEmbedding(self.model_config, self.algorithm_config)
-        self.model = FastSpeech2(self.preprocess_config, self.model_config, self.algorithm_config)
-        self.loss_func = FastSpeech2Loss(self.preprocess_config, self.model_config)
-
-        self.vocoder = LightningMelGAN()
-        self.vocoder.freeze()
-
-        self.reference_extractor = get_reference_extractor_cls(Define.UPSTREAM)()
-        self.reference_extractor.freeze()
+        self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
+        self.loss_func = FastSpeech2Loss(self.model_config)
+        
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
+        self.upstream.freeze()
+        self.embedding_generator = Downstream1(
+            self.model_config["downstream"],
+            n_in_layers=Define.UPSTREAM_LAYER,
+            upstream_dim=Define.UPSTREAM_DIM,
+            specific_layer=Define.LAYER_IDX
+        )
+        self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
 
     def build_optimized_model(self):
-        return nn.ModuleList([self.embedding_model, self.model])
+        return nn.ModuleList([self.embedding_generator, self.model])
 
     def build_saver(self):
-        saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
-        return saver
-    
-    def init_codebook_type(self):        
-        codebook_config = self.algorithm_config["adapt"]["phoneme_emb"]
-        if codebook_config["type"] == "embedding":
-            self.codebook_type = "table-sep"
-        elif codebook_config["type"] == "codebook":
-            self.codebook_type = codebook_config["attention"]["type"]
-        else:
-            raise NotImplementedError
-        self.adaptation_steps = self.algorithm_config["adapt"]["train"]["steps"]
+        self.saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
+        return self.saver
 
-    def build_embedding_table(self, batch):
-        _, _, repr_info, lang_id = batch[0]
+    def build_embedding_table(self, batch):  
+        _, _, sup_info = batch[0]
+
+        # TODO: Mel version
+        self.upstream.eval()
         with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+            ssl_repr, _ = self.upstream.extract(sup_info["raw_feat"])  # B, L, n_layers, dim
+            ssl_repr = ssl_match_length(ssl_repr, sup_info["max_len"].item())
+            ssl_repr = ssl_repr.detach()
 
-        embedding = self.embedding_model.get_new_embedding(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-        embedding = embedding.squeeze(0)
-        embedding[Constants.PAD].fill_(0)
+        x = self.embedding_generator(ssl_repr, sup_info["lens"].cpu())
+        table = self.phoneme_query_extractor(x, sup_info["avg_frames"], 
+                            sup_info["n_symbols"], sup_info["phonemes"])  # 1, n_symbols, n_layers, dim
+        table = table.squeeze(0)  # n_symbols, dim
+        
+        # print("Table shape and gradient required: ", table.shape)
+        # print(table.requires_grad)
+        
+        return table
 
-        if Define.DEBUG:
-            print("Embedding shape and gradient required: ", embedding.shape)
-            print(embedding.requires_grad)
-        return embedding
-
+    def _on_meta_batch_start(self, batch):
+        """ Check meta-batch data """
+        assert len(batch) == 1, "meta_batch_per_gpu"
+        assert len(batch[0]) == 3, "sup + qry + sup_info"
+        assert len(batch[0][0]) == 1, "n_batch == 1"
+        assert len(batch[0][0][0]) == 13, "data with 13 elements"
+    
     def common_step(self, batch, batch_idx, train=True):
-        if Define.DEBUG:
-            print("Extract embedding... ")
         emb_table = self.build_embedding_table(batch)
-        _, qry_batch, _, _ = batch[0]
-        qry_batch = qry_batch[0]
+        qry_batch = batch[0][1][0]
         emb_texts = F.embedding(qry_batch[3], emb_table, padding_idx=0)
         output = self.model(qry_batch[2], emb_texts, *(qry_batch[4:]))
-        loss = self.loss_func(qry_batch, output)
-        return loss, output
+        loss = self.loss_func(qry_batch[:-1], output)
+        loss_dict = {
+            "Total Loss"       : loss[0],
+            "Mel Loss"         : loss[1],
+            "Mel-Postnet Loss" : loss[2],
+            "Pitch Loss"       : loss[3],
+            "Energy Loss"      : loss[4],
+            "Duration Loss"    : loss[5],
+        }
+        
+        return loss_dict, output
 
     def training_step(self, batch, batch_idx):
-        train_loss, predictions = self.common_step(batch, batch_idx, train=True)
+        train_loss_dict, output = self.common_step(batch, batch_idx, train=True)
         qry_batch = batch[0][1][0]
 
         # Log metrics to CometLogger
-        loss_dict = {f"Train/{k}": v for k, v in loss2dict(train_loss).items()}
+        loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
         self.log_dict(loss_dict, sync_dist=True)
-        return {'loss': train_loss[0], 'losses': train_loss, 'output': predictions, '_batch': qry_batch}
+        return {'loss': train_loss_dict["Total Loss"], 'losses': train_loss_dict, 'output': output, '_batch': qry_batch}
 
     def validation_step(self, batch, batch_idx):
-        self.log_matching(batch, batch_idx)
-        val_loss, predictions = self.common_step(batch, batch_idx)
+        val_loss_dict, predictions = self.common_step(batch, batch_idx, train=False)
         qry_batch = batch[0][1][0]
 
-        # Log metrics to CometLogger
-        loss_dict = {f"Val/{k}": v for k, v in loss2dict(val_loss).items()}
-        self.log_dict(loss_dict, sync_dist=True)
-        return {'losses': val_loss, 'output': predictions, '_batch': qry_batch}
-    
-    def visualize_matching(self, batch, batch_idx):
-        if self.codebook_type != "table-sep":
-            _, _, repr_info, lang_id = batch[0]
-            with torch.no_grad():
-                ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
-            matching = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-            self.codebook_analyzer.visualize_matching(batch_idx, matching)
-        return None
-
-    def log_matching(self, batch, batch_idx, stage="val"):
-        step = self.global_step + 1
-        _, _, repr_info, lang_id = batch[0]
-        with torch.no_grad():
-            ref_phn_feats = self.reference_extractor.extract(repr_info, norm=False)
+        # visualization
+        if batch_idx == 0:
+            layer_weights = F.softmax(self.embedding_generator.weighted_sum.weight_raw, dim=0)
+            self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
         
-        matchings = self.embedding_model.get_matching(self.codebook_type, ref_phn_feats=ref_phn_feats, lang_id=lang_id)
-        for matching in matchings:
-            fig = self.codebook_analyzer.plot_matching(matching, quantized=False)
-            figure_name = f"{stage}/step_{step}_{batch_idx:03d}_{matching['title']}"
-            self.logger.experiment.log_figure(
-                figure_name=figure_name,
-                figure=fig,
-                step=step,
-            )
-            plt.close(fig)
+        # Log metrics to CometLogger
+        loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
+        self.log_dict(loss_dict, sync_dist=True)
+        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': qry_batch}
+    
+    def on_save_checkpoint(self, checkpoint):
+        """ (Hacking!) Remove pretrained weights in checkpoint to save disk space. """
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for k in state_dict:
+            if k.split('.')[0] == "upstream":
+                continue
+            new_state_dict[k] = state_dict[k]
+        checkpoint["state_dict"] = new_state_dict
+
+        return checkpoint

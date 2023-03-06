@@ -60,6 +60,7 @@ class LJSpeechRawParser(BaseRawParser):
         with Pool(processes=n_workers) as pool:
             for res in tqdm(pool.imap(ImapWrapper(self.prepare_initial_features), tasks, chunksize=64), total=n):
                 pass
+        self.data_parser.text.read_all(refresh=True)
 
 
 class LJSpeechPreprocessor(BasePreprocessor):

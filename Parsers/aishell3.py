@@ -30,7 +30,8 @@ class AISHELL3RawParser(BaseRawParser):
             for i, line in tqdm(enumerate(f)):
                 if i < 5 or line == '\n':
                     continue
-                wav_name, text, _ = line.strip().split('|')
+                wav_name, _, text = line.strip().split('|')
+                text = text.replace("%", '').replace("$", '')
                 speaker = wav_name[:-4]
                 if speaker not in res["all_speakers"]:
                     res["all_speakers"].append(speaker)
@@ -62,6 +63,7 @@ class AISHELL3RawParser(BaseRawParser):
         with Pool(processes=n_workers) as pool:
             for res in tqdm(pool.imap(ImapWrapper(self.prepare_initial_features), tasks, chunksize=64), total=n):
                 pass
+        self.data_parser.text.read_all(refresh=True)
 
 
 class AISHELL3Preprocessor(BasePreprocessor):
@@ -90,4 +92,4 @@ class AISHELL3Preprocessor(BasePreprocessor):
         output_dir = os.path.dirname(cleaned_data_info_path)
         with open(cleaned_data_info_path, 'r', encoding='utf-8') as f:
             queries = json.load(f)
-        template.split_multispeaker_dataset(self.data_parser, queries, output_dir, val_spk_size=20)
+        template.split_multispeaker_dataset(self.data_parser, queries, output_dir, val_spk_size=10)

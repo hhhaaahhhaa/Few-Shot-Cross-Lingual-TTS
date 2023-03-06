@@ -24,8 +24,8 @@ def sqrt_schedule(train_config):
     anneal_rate = train_config["optimizer"].get("anneal_rate", 1.0)
 
     def lr_lambda(step):
+        current_step = step + 1
         if n_warmup_steps > 0:
-            current_step = step + 1
             if current_step <= n_warmup_steps:
                 factor = current_step / n_warmup_steps
             else:
@@ -46,8 +46,8 @@ def const_schedule(train_config):
     anneal_rate = train_config["optimizer"].get("anneal_rate", 1.0)
 
     def lr_lambda(step):
+        current_step = step + 1
         if n_warmup_steps > 0:
-            current_step = step + 1
             if current_step <= n_warmup_steps:
                 factor = current_step / n_warmup_steps
             else:

@@ -98,7 +98,7 @@ def evaluate_ssl_unit(unit_name: str, root: str, symbol_ref2unify: Dict, symbol_
     fer = fer_calculator.exec(
         data_parser, queries, 
         "phoneme", "mfa_segment",
-        f"ssl_units/{unit_name}/phoneme", f"ssl_units/{unit_name}/dp_segment",
+        f"ssl_units/{unit_name}/phoneme", f"ssl_units/{unit_name}/segment",
         symbol_ref2unify, symbol_pred2unify,
         fp=0.02
     )
@@ -112,7 +112,7 @@ def evaluate_ssl_unit(unit_name: str, root: str, symbol_ref2unify: Dict, symbol_
     seg_result = seg_evaluator.exec(
         data_parser, queries, 
         "mfa_segment",
-        f"ssl_units/{unit_name}/dp_segment",
+        f"ssl_units/{unit_name}/segment",
     )
     print(per_dict)
     print(f"Frame error rate: {fer * 100:.2f}%")

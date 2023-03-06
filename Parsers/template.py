@@ -1,19 +1,20 @@
 import warnings
-
-from lightning.utils.tool import write_queries_to_txt
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import librosa
 import json
+import random
 
 from dlhlp_lib.audio.tools import wav_normalization
 from dlhlp_lib.audio import AUDIO_CONFIG
 from dlhlp_lib.tts_preprocess.basic import *
 
 import Define
-from Parsers.parser import DataParser
+from .parser import DataParser
+from .utils import write_queries_to_txt
 
 
 INV_FRAME_PERIOD = AUDIO_CONFIG["audio"]["sampling_rate"] / AUDIO_CONFIG["stft"]["hop_length"]
+random.seed(0)
 
 
 def prepare_initial_features(data_parser: DataParser, query, data):
@@ -93,7 +94,6 @@ def preprocess(data_parser: DataParser, queries):
         json.dump(stats, f)
     
     # Generate cache
-    data_parser.text.read_all(refresh=True)
     data_parser.phoneme.read_all(refresh=True)
     data_parser.mfa_segment.read_all(refresh=True)
     data_parser.mfa_duration_avg_energy.read_all(refresh=True)
@@ -101,10 +101,12 @@ def preprocess(data_parser: DataParser, queries):
 
 
 def split_monospeaker_dataset(data_parser: DataParser, queries, output_dir, val_size=1000):
-    trainset = queries[:-val_size]
-    valset = queries[-val_size:]
-    write_queries_to_txt(data_parser, trainset, f"{output_dir}/train.txt")
-    write_queries_to_txt(data_parser, valset, f"{output_dir}/val.txt")
+    train_set = queries[:-val_size]
+    val_set = queries[-val_size:]
+    test_set = random.sample(val_set, k=200)
+    write_queries_to_txt(data_parser, train_set, f"{output_dir}/train.txt")
+    write_queries_to_txt(data_parser, val_set, f"{output_dir}/val.txt")
+    write_queries_to_txt(data_parser, test_set, f"{output_dir}/test.txt")
 
 
 def split_multispeaker_dataset(data_parser: DataParser, queries, output_dir, val_spk_size=40):
@@ -120,5 +122,8 @@ def split_multispeaker_dataset(data_parser: DataParser, queries, output_dir, val
             val_set.append(q)
         else:
             raise ValueError("Unknown speaker detected, some error exists when preprocessing data.")
+    test_set = random.sample(val_set, k=200)
+    
     write_queries_to_txt(data_parser, train_set, f"{output_dir}/train.txt")
     write_queries_to_txt(data_parser, val_set, f"{output_dir}/val.txt")
+    write_queries_to_txt(data_parser, test_set, f"{output_dir}/test.txt")

@@ -9,7 +9,6 @@ from lightning.utils.log import pr_loss2dict as loss2dict
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-# from .modules import BiLSTMDownstream, SoftAttCodebook, PRFramewiseLoss
 from lightning.model.reduction import PhonemeQueryExtractor
 
 
@@ -87,7 +86,7 @@ class TransHeadSystem(AdaptorSystem):
 
         # TransHead          
         output = F.linear(x, head_weights, bias=self.trans_head_bias)
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
 
         return loss, 
         
@@ -113,7 +112,7 @@ class TransHeadSystem(AdaptorSystem):
 
         # TransHead          
         output = F.linear(x, head_weights, bias=self.trans_head_bias)
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
 
         return loss, output
 

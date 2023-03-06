@@ -1,0 +1,15 @@
+scheduler_type: sqrt
+optimizer:
+  lr: 0.0001
+  batch_size: 4
+  betas: [0.9, 0.98]
+  eps: 0.000000001
+  weight_decay: 0.0
+  grad_clip_thresh: 1.0
+  grad_acc_step: 1
+step:
+  total_step: 500
+  log_step: 100
+  synth_step: 100000
+  val_step: 250
+  save_step: 500

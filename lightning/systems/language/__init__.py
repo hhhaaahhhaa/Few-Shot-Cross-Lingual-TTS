@@ -1,6 +1,9 @@
 from .FastSpeech2 import BaselineSystem
-from .FastSpeech2Tune import BaselineTuneSystem
+from .ContiAE import ContiAESystem
+from .TransEmbOrig import TransEmbOrigSystem, TransEmbOrig2System
+from .TransEmbADA import ada_class_factory, ssl_ada_class_factory
+from .tune.FastSpeech2Tune import BaselineTuneSystem, TransEmbOrigTuneSystem
+
+# Deprecated
 from .TransEmb import TransEmbSystem
-from .TransEmbTune import TransEmbTuneSystem
-from .SemiTransEmb import SemiTransEmbSystem
-from .SemiTransEmbTune import SemiTransEmbTuneSystem
+from .TransEmbC import TransEmbCSystem

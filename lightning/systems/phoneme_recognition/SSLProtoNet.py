@@ -6,12 +6,12 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
-from text.define import LANG_ID2SYMBOLS
+from lightning.build import build_ctc_decoders, build_id2symbols
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.model.reduction import PhonemeQueryExtractor
 from lightning.utils.tool import ssl_match_length
-from .modules import PRFramewiseLoss
+from .loss import PRFramewiseLoss
 from .downstreams import *
 from .heads import *
 from .SSLBaseline import training_step_template, validation_step_template
@@ -21,7 +21,7 @@ class SSLProtoNetSystem(AdaptorSystem):
 
     def __init__(self, *args, **kwargs):
         self.support_head = False
-        self.use_ctc = True
+        self.use_ctc = False  # TODO: not finished yet (random crash bug)
         super().__init__(*args, **kwargs)
 
     def build_model(self):
@@ -36,11 +36,11 @@ class SSLProtoNetSystem(AdaptorSystem):
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=False)
         if self.support_head:
             self.head = MultilingualPRHead(
-                LANG_ID2SYMBOLS, d_in=self.model_config["transformer"]["d_model"])
+                build_id2symbols(self.data_configs), d_in=self.model_config["transformer"]["d_model"])
         
         if self.use_ctc:
-            # self.loss_func = nn.CTCLoss(blank=0, zero_infinity=True)
-            self.loss_func = PRFramewiseLoss()
+            self.loss_func = nn.CTCLoss(blank=0, zero_infinity=True)
+            build_ctc_decoders(self.data_configs)
         else:
             self.loss_func = PRFramewiseLoss()
 
@@ -57,7 +57,7 @@ class SSLProtoNetSystem(AdaptorSystem):
         return nn.ModuleList([self.downstream])
 
     def build_saver(self):
-        saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
+        saver = Saver(self.data_configs, self.log_dir, self.result_dir)
         return saver
     
     def build_prototype(self, batch):
@@ -80,7 +80,6 @@ class SSLProtoNetSystem(AdaptorSystem):
         return prototypes
 
     def common_step(self, batch, batch_idx, train=True):
-        # print("Generate prototypes... ")
         prototypes = self.build_prototype(batch)
 
         sup_batch, qry_batch, repr_info = batch[0]
@@ -97,12 +96,12 @@ class SSLProtoNetSystem(AdaptorSystem):
         # Prototype loss
         output = -torch.linalg.norm(prototypes.unsqueeze(0).unsqueeze(0) - x.unsqueeze(2), dim=3)  # B, L, n_c
         if self.use_ctc:
-            loss = self.loss_func(labels, output)
+            loss = self.loss_func(labels[3], output)
         #     log_probs = torch.log_softmax(output, dim=2)
         #     with torch.backends.cudnn.flags(deterministic=True):  # for reproducibility
         #         loss = self.loss_func(log_probs.transpose(0, 1), labels[6], labels[4].cpu(), labels[7].cpu())
         else:
-            loss = self.loss_func(labels, output)
+            loss = self.loss_func(labels[3], output)
 
         if self.support_head:
             output_support = self.head(x, lang_id=repr_info["lang_id"])

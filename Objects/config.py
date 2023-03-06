@@ -1,5 +1,5 @@
-from typing import Dict
 import yaml
+import Define
 
 
 class LanguageDataConfigReader(object):
@@ -8,18 +8,30 @@ class LanguageDataConfigReader(object):
 
     def read(self, root):
         config = yaml.load(open(f"{root}/config.yaml", "r"), Loader=yaml.FullLoader)
-        self.name = config["dataset"]
-        self.lang_id = config["lang_id"]
-        self.data_dir = config["preprocessed_path"]
-        self.subsets = {
-            "train": f"{root}/{config['subsets']['train']}",
-            "val": f"{root}/{config['subsets']['val']}",
-            "test": f"{root}/{config['subsets']['test']}",
-        }
-        return {
-            "name": self.name,
-            "lang_id": self.lang_id,
-            "data_dir": self.data_dir,
-            "subsets": self.subsets,
-            "text_cleaners": ["transliteration_cleaners"],
-        }
+        if "lang_id" not in config:
+            config["lang_id"] = "en"
+        for k in config['subsets']:
+            config['subsets'][k] = f"{root}/{config['subsets'][k]}"
+        if "symbol_id" not in config:
+            if "n_symbols" in config:
+                config["symbol_id"] = config["unit_name"]
+                config["use_real_phoneme"] = False
+            else:
+                config["symbol_id"] = config["lang_id"]
+                config["use_real_phoneme"] = True
+        
+        if Define.TUNET2U:
+            config["target"] = {
+                "unit_name": "enzhkofres-hubert_large_ll60k-24-512c",
+                "n_symbols": 512,
+            }
+        if "target" in config:
+            target = config["target"]
+            if "n_symbols" in target:
+                target["symbol_id"] = target["unit_name"]
+                target["use_real_phoneme"] = False
+            else:
+                target["symbol_id"] = target["lang_id"]
+                target["use_real_phoneme"] = True
+        
+        return config

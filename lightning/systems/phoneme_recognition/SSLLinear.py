@@ -6,17 +6,17 @@ import torch.nn.functional as F
 from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
-from text.define import LANG_ID2SYMBOLS
+from lightning.build import build_id2symbols
 from lightning.systems.system import System
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.utils.tool import ssl_match_length
-from .modules import PRFramewiseLoss
+from .loss import PRFramewiseLoss
 from .downstreams import *
 from .heads import *
 from .SSLBaseline import training_step_template, validation_step_template
 
 
-class SSLLinearTuneSystem(System):
+class SSLLinearSystem(System):
     """
     Classical linear downstream evaluation.
     """
@@ -30,7 +30,8 @@ class SSLLinearTuneSystem(System):
         self.upstream.freeze()
         self.downstream = WeightedSumLayer(
             n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
-        self.head = MultilingualPRHead(LANG_ID2SYMBOLS, d_in=Define.UPSTREAM_DIM)
+        self.head = MultilingualPRHead(
+            build_id2symbols(self.data_configs), d_in=Define.UPSTREAM_DIM)
         
         self.loss_func = PRFramewiseLoss()
 
@@ -38,14 +39,9 @@ class SSLLinearTuneSystem(System):
         return nn.ModuleList([self.downstream, self.head])
 
     def build_saver(self):
-        saver = Saver(self.preprocess_config, self.log_dir, self.result_dir)
+        saver = Saver(self.data_configs, self.log_dir, self.result_dir)
         return saver
 
-    # Tune Interface
-    def tune_init(self, *args, **kwargs):
-        self.lang_id = self.preprocess_config["lang_id"]
-        print("Current language: ", self.lang_id)
-        
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch
 
@@ -61,7 +57,7 @@ class SSLLinearTuneSystem(System):
         x = self.downstream(ssl_repr, dim=2)
        
         output = self.head(x, lang_id=repr_info["lang_id"])
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
         loss_dict = {
             "Total Loss": loss,
         }

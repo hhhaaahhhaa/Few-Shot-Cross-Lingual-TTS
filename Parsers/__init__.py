@@ -9,6 +9,10 @@ from .aishell3 import AISHELL3Preprocessor, AISHELL3RawParser
 from .css10 import CSS10Preprocessor, CSS10RawParser
 from .kss import KSSPreprocessor, KSSRawParser
 from .jsut import JSUTPreprocessor, JSUTRawParser
+from .alffa import ALFFASWRawParser, ALFFAAMRawParser, ALFFAWORawParser, ALFFASWPreprocessor, ALFFAAMPreprocessor, ALFFAWOPreprocessor
+from .m_ailabs import MAILABSPreprocessor, MAILABSRawParser
+from .lad import LADPreprocessor, LADRawParser
+from .csmsc import CSMSCPreprocessor, CSMSCRawParser
 
 
 PREPROCESSORS = {
@@ -20,6 +24,12 @@ PREPROCESSORS = {
     "JSUT": JSUTPreprocessor,
     # "TAT": TATPreprocessor,
     # "TATTTS": TATTTSPreprocessor,
+    "ALFFA-SW": ALFFASWPreprocessor,
+    "ALFFA-AM": ALFFAAMPreprocessor,
+    "ALFFA-WO": ALFFAWOPreprocessor,
+    "M-AILABS": MAILABSPreprocessor,
+    "LAD": LADPreprocessor,
+    "CSMSC": CSMSCPreprocessor,
 }
 
 RAWPARSERS = {
@@ -31,6 +41,12 @@ RAWPARSERS = {
     "JSUT": JSUTRawParser,
     # "TAT": TATRawParser,
     # "TATTTS": TATTTSRawParser,
+    "ALFFA-SW": ALFFASWRawParser,
+    "ALFFA-AM": ALFFAAMRawParser,
+    "ALFFA-WO": ALFFAWORawParser,
+    "M-AILABS": MAILABSRawParser,
+    "LAD": LADRawParser,
+    "CSMSC": CSMSCRawParser,
 }
 
 

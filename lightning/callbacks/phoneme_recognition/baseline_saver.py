@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import pytorch_lightning as pl
 import matplotlib
+
+from lightning.build import build_id2symbols
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
@@ -11,8 +13,7 @@ from pytorch_lightning.callbacks import Callback
 from pytorch_lightning.loggers.base import merge_dicts
 from pytorch_lightning.utilities import rank_zero_only
 
-from lightning.utils.log import pr_loss2dict as loss2dict
-from text.define import LANG_ID2SYMBOLS
+from lightning.utils.log_old import pr_loss2dict as loss2dict
 
 
 # Old version, will be removed future, these variables should be decided at runtime.
@@ -28,9 +29,15 @@ def set_format(keys: List[str]):
 
 class Saver(Callback):
 
-    def __init__(self, preprocess_config, log_dir=None, result_dir=None):
+    def __init__(self, data_configs, log_dir, result_dir):
         super().__init__()
-        self.preprocess_config = preprocess_config
+        self.data_configs = data_configs
+        self.id2symbols = build_id2symbols(self.data_configs)
+        increment = 0
+        self.re_id_increment = {}
+        for k, v in self.id2symbols.items():
+            self.re_id_increment[k] = increment
+            increment += len(v)
 
         self.log_dir = log_dir
         self.result_dir = result_dir
@@ -41,13 +48,6 @@ class Saver(Callback):
 
         self.val_loss_dicts = []
         self.log_loss_dicts = []
-
-        self.re_id = False
-        increment = 0
-        self.re_id_increment = {}
-        for k, v in LANG_ID2SYMBOLS.items():
-            self.re_id_increment[k] = increment
-            increment += len(v)
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         loss = outputs['losses']
@@ -78,7 +78,7 @@ class Saver(Callback):
 
             # log asr results
             sentence = _batch[3][0]
-            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), lang_id=lang_id)
+            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), symbol_id=lang_id)
             
             self.log_text(logger, "Train/GT: " + ", ".join(gt_sentence), step)
             self.log_text(logger, "Train/Pred: " + ", ".join(pred_sentence), step)
@@ -113,7 +113,7 @@ class Saver(Callback):
 
             # log asr results
             sentence = _batch[3][0]
-            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), lang_id=lang_id)
+            gt_sentence, pred_sentence = self.recover_sentences(sentence, output[0].argmax(dim=1), symbol_id=lang_id)
             
             self.log_text(logger, "Val/GT: " + ", ".join(gt_sentence), step)
             self.log_text(logger, "Val/Pred: " + ", ".join(pred_sentence), step)
@@ -156,15 +156,14 @@ class Saver(Callback):
                 step=step,
             )
 
-    def recover_sentences(self, gt_ids, pred_ids, lang_id: int) -> Tuple[List[str], List[str]]:
+    def recover_sentences(self, gt_ids, pred_ids, symbol_id: str) -> Tuple[List[str], List[str]]:
         gt_sentence, pred_sentence = [], []
         for (gt_id, pred_id) in zip(gt_ids, pred_ids):
             if gt_id == 0:
                 break
-            if self.re_id:
-                gt_id = int(gt_id) - self.re_id_increment[lang_id]
-                pred_id = int(pred_id) - self.re_id_increment[lang_id]
-            gt_sentence.append(LANG_ID2SYMBOLS[lang_id][gt_id])
-            pred_sentence.append(LANG_ID2SYMBOLS[lang_id][pred_id])
+            gt_id = int(gt_id) - self.re_id_increment[symbol_id]
+            pred_id = int(pred_id) - self.re_id_increment[symbol_id]
+            gt_sentence.append(self.id2symbols[symbol_id][gt_id])
+            pred_sentence.append(self.id2symbols[symbol_id][pred_id])
 
         return gt_sentence, pred_sentence

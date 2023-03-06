@@ -5,14 +5,10 @@ import torch.nn as nn
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
 
-    def __init__(self, preprocess_config, model_config):
+    def __init__(self, model_config, **kwargs):
         super(FastSpeech2Loss, self).__init__()
-        self.pitch_feature_level = preprocess_config["preprocessing"]["pitch"][
-            "feature"
-        ]
-        self.energy_feature_level = preprocess_config["preprocessing"]["energy"][
-            "feature"
-        ]
+        self.pitch_feature_level = model_config["pitch"]["feature"]
+        self.energy_feature_level = model_config["energy"]["feature"]
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
 
@@ -74,8 +70,8 @@ class FastSpeech2Loss(nn.Module):
         mel_loss = self.mae_loss(mel_predictions, mel_targets)
         postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
-        pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
-        energy_loss = self.mse_loss(energy_predictions, energy_targets)
+        pitch_loss = self.mse_loss(pitch_predictions, pitch_targets.float())
+        energy_loss = self.mse_loss(energy_predictions, energy_targets.float())
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
         total_loss = (
@@ -103,3 +99,42 @@ class PhonemeClassificationLoss(nn.Module):
         preds = preds.transpose(1, 2)  # B, N, L
         target = batch[3]  # B, L
         return self.loss(preds, target)
+
+
+class FastSpeech2ADALoss(nn.Module):
+    """ FastSpeech2 ADA Loss, no variance adaptor-related loss"""
+
+    def __init__(self):
+        super().__init__()
+        self.mae_loss = nn.L1Loss()
+
+    def forward(self, inputs, predictions):
+        mel_targets = inputs
+        (
+            mel_predictions,
+            postnet_mel_predictions,
+            mel_masks
+        ) = predictions
+        mel_masks = ~mel_masks
+
+        mel_targets = mel_targets[:, : mel_masks.shape[1], :]
+        mel_masks = mel_masks[:, :mel_masks.shape[1]]
+
+        mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
+        postnet_mel_predictions = postnet_mel_predictions.masked_select(
+            mel_masks.unsqueeze(-1)
+        )
+        mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
+
+        mel_loss = self.mae_loss(mel_predictions, mel_targets)
+        postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+
+        total_loss = (
+            mel_loss + postnet_mel_loss
+        )
+
+        return (
+            total_loss,
+            mel_loss,
+            postnet_mel_loss,
+        )

@@ -5,9 +5,9 @@ import pytorch_lightning as pl
 import random
 
 from dlhlp_lib.utils import DataPool
+from dlhlp_lib.utils.numeric import torch_exist_nan
 
 import Define
-from lightning.utils.tool import torch_exist_nan
 
 
 class SegmentationLevelAverage(pl.LightningModule):

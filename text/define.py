@@ -1,9 +1,8 @@
-from text.symbols import symbols, common_symbols, en_symbols, zh_symbols
+from typing import List, Dict
 
-"""
-0: en   1: zh   2: fr   3:de
-4: ru   5: es   6: jp   8:ko
-"""
+from text.symbols import common_symbols, en_symbols, zh_symbols
+
+
 def get_phoneme_set(path, encoding='utf-8'):
     phns = []
     with open(path, 'r', encoding=encoding) as f:
@@ -15,26 +14,21 @@ def get_phoneme_set(path, encoding='utf-8'):
 
 
 LANG_ID2SYMBOLS = {
-    0: en_symbols,
-    1: zh_symbols,
-    2: common_symbols + get_phoneme_set("../MFA/lexicon/French/phoneset.txt"),
-    3: common_symbols + get_phoneme_set("../MFA/lexicon/German/phoneset_css10-de.txt"),
-    4: [],
-    5: common_symbols + get_phoneme_set("../MFA/lexicon/Spanish/phoneset.txt"),
-    6: common_symbols + get_phoneme_set("../MFA/lexicon/Japanese/phoneset.txt"),
-    7: common_symbols + get_phoneme_set("../MFA/lexicon/Czech/phoneset.txt"),
-    8: common_symbols + get_phoneme_set("../MFA/lexicon/Korean/phoneset.txt"),
+    "en": en_symbols,
+    "zh": zh_symbols,
+    "fr": common_symbols + get_phoneme_set("MFA/French/phoneset.txt"),
+    "de": common_symbols + get_phoneme_set("MFA/German/phoneset.txt"),
+    "ru": [],
+    "es": common_symbols + get_phoneme_set("MFA/Spanish/phoneset.txt"),
+    "jp": common_symbols + get_phoneme_set("MFA/Japanese/phoneset.txt"),
+    "cz": [],
+    "ko": common_symbols + get_phoneme_set("MFA/Korean/phoneset.txt"),
+    "nl": [],
 }
 
 
-LANG_ID2NAME = {
-    0: "en",
-    1: "zh",
-    2: "fr",
-    3: "de",
-    4: "ru",
-    5: "es",
-    6: "jp",
-    7: "cz",
-    8: "ko"
-}
+LANGS = [
+    "en", "zh", "fr", "de", "ru", "es", "jp", "cz", "ko", "nl"
+]
+LANG_ID2NAME = {i: name for i, name in enumerate(LANGS)}
+LANG_NAME2ID = {name: i for i, name in enumerate(LANGS)}

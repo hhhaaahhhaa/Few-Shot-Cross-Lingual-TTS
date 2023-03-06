@@ -9,7 +9,6 @@ from lightning.systems.system import System
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 import Define
 from text.define import LANG_ID2SYMBOLS
-# from .modules import BiLSTMDownstream, MultiHeadAttentionCodebook, MultilingualClusterHead, PRFramewiseLoss, OrthoLoss
 from lightning.utils.tool import ssl_match_length
 
 
@@ -66,7 +65,7 @@ class SSLCodebookClusterSystem(System):
         x, _ = self.codebook(x)
        
         output = self.head(x, lang_id=repr_info["lang_id"])
-        loss = self.loss_func(labels, output)
+        loss = self.loss_func(labels[3], output)
         ortho_loss = self.ortho_loss()
         loss_dict = {
             "Total Loss": loss + ortho_loss,

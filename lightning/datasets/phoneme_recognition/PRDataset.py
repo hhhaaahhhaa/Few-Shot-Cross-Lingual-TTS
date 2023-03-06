@@ -3,11 +3,11 @@ from torch.utils.data import Dataset
 import json
 
 from dlhlp_lib.utils.tool import segment2duration
+from dlhlp_lib.utils.numeric import numpy_exist_nan
 
 from text import text_to_sequence
 from text.define import LANG_ID2SYMBOLS
 from Parsers.parser import DataParser
-from lightning.utils.tool import numpy_exist_nan
 
 
 class MelPRDataset(Dataset):
