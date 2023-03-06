@@ -3,7 +3,7 @@ import torch
 from functools import partial
 from collections import defaultdict
 
-from text.define import LANG_NAME2ID
+from text.define import LANG_NAME2ID, LANG_ID2NAME
 from lightning.build import build_all_speakers, build_id2symbols
 from .utils import reprocess
 
@@ -74,7 +74,7 @@ class FSCLCollate(object):
             lang_id = data[idxs[0]]["lang_id"]
             n_symbols = data[idxs[0]]["n_symbols"]
             sup_info = {}
-            sup_info["lang_id"] = lang_id
+            sup_info["lang_id"] = LANG_ID2NAME[lang_id]
             sup_info["n_symbols"] = n_symbols
             sup_info["phonemes"] = [data[idx]["text"] for idx in sup_ids]
             sup_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in sup_ids]

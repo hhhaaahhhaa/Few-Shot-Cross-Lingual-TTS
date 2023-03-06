@@ -89,14 +89,14 @@ class SoftMultiAttCodebook2(nn.Module):
 
         self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
 
-        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None and Define.LAYER_IDX is not None:
-            self.weight_raw = nn.Parameter(torch.ones(1, Define.UPSTREAM_LAYER, 1))
-            
+        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None and Define.LAYER_IDX is not None:            
             if Define.LAYER_IDX is not None:
-                # normalize code debug
-                self.weight_raw = self.weight_raw * float('-inf')
-                self.weight_raw[0][Define.LAYER_IDX][0] = 10.0
+                weights = torch.ones(1, Define.UPSTREAM_LAYER, 1) * float('-inf')
+                weights[0][Define.LAYER_IDX][0] = 10.0
+                self.weight_raw = nn.Parameter(weights)
                 self.weight_raw.requires_grad = False
+            else:
+                self.weight_raw = nn.Parameter(torch.ones(1, Define.UPSTREAM_LAYER, 1))
 
         self.q_linear = nn.Linear(Define.UPSTREAM_DIM, self.d_word_vec)
 

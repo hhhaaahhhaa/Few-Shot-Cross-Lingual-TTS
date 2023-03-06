@@ -10,7 +10,6 @@ from dlhlp_lib.utils.tool import get_mask_from_lengths
 class WeightedSumLayer(nn.Module):
     def __init__(self, n_in_layers: int, specific_layer: Optional[int]=None) -> None:
         super().__init__()
-        self.weight_raw = nn.Parameter(torch.randn(n_in_layers))
         self.n_in_layers = n_in_layers
             
         # specific layer, fix weight_raw during training.
@@ -19,6 +18,8 @@ class WeightedSumLayer(nn.Module):
             weights[specific_layer] = 10.0
             self.weight_raw = nn.Parameter(weights)
             self.weight_raw.requires_grad = False
+        else:
+            self.weight_raw = nn.Parameter(torch.randn(n_in_layers))
 
     def forward(self, x, dim: int):
         weight_shape = [1] * x.dim()

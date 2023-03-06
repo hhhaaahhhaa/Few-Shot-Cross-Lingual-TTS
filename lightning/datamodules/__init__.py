@@ -10,6 +10,7 @@ DATA_MODULE = {
     "fscl": language.FSCLDataModule,
     "fscl-orig": language.FSCLDataModule,
     "fscl-linear": language.FSCLDataModule,
+    "fscl-transformer": language.FSCLDataModule,
     "fscl-ada1": language.FSCLDataModule,
     "fscl-ada2": language.FSCLDataModule,
     "fscl-ssl_ada1": language.FSCLDataModule,

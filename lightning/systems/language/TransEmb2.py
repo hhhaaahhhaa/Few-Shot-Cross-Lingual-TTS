@@ -8,7 +8,7 @@ from lightning.build import build_all_speakers
 from lightning.systems.adaptor import AdaptorSystem
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.callbacks.language.baseline_saver import Saver
-from ..plugin.fscl import IFSCLPlugIn, OrigFSCLPlugIn, LinearFSCLPlugIn
+from ..plugin.fscl import IFSCLPlugIn, OrigFSCLPlugIn, LinearFSCLPlugIn, TransformerFSCLPlugIn
 
 
 
@@ -28,6 +28,7 @@ def fscl_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
             self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
             self.loss_func = FastSpeech2Loss(self.model_config)
             self.fscl = FSCLPlugInClass(self.model_config)
+            self.fscl.build_model()
 
         def build_optimized_model(self):
             return nn.ModuleList([self.model]) + self.fscl.build_optimized_model()
@@ -73,14 +74,12 @@ def fscl_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
             val_loss_dict, predictions, attn = self.common_step(batch, batch_idx, train=False)
             qry_batch = batch[0][1][0]
 
-            # Can be processed in specific saver
-            # visualization
-            # if batch_idx == 0:
-            #     layer_weights = self.fscl.get_layer_weights()
-            #     self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
-            # if batch_idx % 4 == 0:
-            #     lang_id = qry_batch[-1][0].item()  # all batch belongs to the same language
-            #     self.saver.log_codebook_attention(self.logger, attn, lang_id, batch_idx, self.global_step + 1, "val")
+            if batch_idx == 0:
+                layer_weights = self.fscl.get_layer_weights()
+                self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
+            if batch_idx % 4 == 0:
+                lang_id = qry_batch[-1][0].item()  # all batch belongs to the same language
+                self.saver.log_codebook_attention(self.logger, attn, lang_id, batch_idx, self.global_step + 1, "val")
             
             # Log metrics to CometLogger
             loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
@@ -96,3 +95,4 @@ def fscl_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
 
 TransEmbOrigSystem = fscl_fastspeech2_class_factory(OrigFSCLPlugIn)
 TransEmbLinearSystem = fscl_fastspeech2_class_factory(LinearFSCLPlugIn)
+TransEmbTransformerSystem = fscl_fastspeech2_class_factory(TransformerFSCLPlugIn)
