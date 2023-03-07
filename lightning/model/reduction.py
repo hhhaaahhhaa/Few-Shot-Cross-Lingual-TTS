@@ -74,6 +74,11 @@ class PhonemeQueryExtractor(pl.LightningModule):
                         for r in repr[pos: pos + d]:
                             table[int(p)].append(r)
                 pos += d
+                # CAUTION: Torch slicing return [] instead of raising error when index is out of range. May cause NaN in later operations.
+                # Therefore we'll manually check it and break.
+                # Also we need d > 0 or else slicing will also return [].
+                if pos >= len(repr):
+                    break
 
         phn_query = self.reduction(list(range(n_symbols)), table, dims)
         phn_query = phn_query.unsqueeze(0)  # 1, n_symbols, layer, dim

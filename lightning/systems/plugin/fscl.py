@@ -49,21 +49,21 @@ class OrigFSCLPlugIn(pl.LightningModule):
 
     def build_embedding_table(self, ref_infos, return_attn=False):
         self.upstream.eval()
-        with torch.no_grad():
-            hiddens, avg_frames_list, phonemes_list = [], [], []
-            for info in ref_infos:
+        hiddens, avg_frames_list, phonemes_list = [], [], []
+        for info in ref_infos:
+            with torch.no_grad():
                 ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
                 ssl_repr = ssl_repr.detach()
-                hiddens.extend([x1 for x1 in ssl_repr])
-                avg_frames_list.extend(info["avg_frames"])
-                phonemes_list.extend(info["phonemes"])
-            
-            table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
-                                len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
-            
-            table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
-            table = table.squeeze(0)  # n_symbols, dim
-            table[0].fill_(0)
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+            phonemes_list.extend(info["phonemes"])
+        
+        table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
+                            len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
+        
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        table = table.squeeze(0)  # n_symbols, dim
+        table[0].fill_(0)
         return table, attn
         
     def on_save_checkpoint(self, checkpoint, prefix=""):
@@ -118,22 +118,22 @@ class LinearFSCLPlugIn(pl.LightningModule):
 
     def build_embedding_table(self, ref_infos, return_attn=False):
         self.upstream.eval()
-        with torch.no_grad():
-            hiddens, avg_frames_list, phonemes_list = [], [], []
-            for info in ref_infos:
+        hiddens, avg_frames_list, phonemes_list = [], [], []
+        for info in ref_infos:
+            with torch.no_grad():
                 ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
                 ssl_repr = ssl_repr.detach()
-                ssl_repr = self.downstream(ssl_repr)
-                hiddens.extend([x1 for x1 in ssl_repr])
-                avg_frames_list.extend(info["avg_frames"])
-                phonemes_list.extend(info["phonemes"])
+            ssl_repr = self.downstream(ssl_repr)
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+            phonemes_list.extend(info["phonemes"])
             
-            table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
-                                len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
-            
-            table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
-            table = table.squeeze(0)  # n_symbols, dim
-            table[0].fill_(0)
+        table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
+                            len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
+        
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        table = table.squeeze(0)  # n_symbols, dim
+        table[0].fill_(0)
         return table, attn
         
     def on_save_checkpoint(self, checkpoint, prefix=""):
@@ -159,8 +159,7 @@ class LinearFSCLPlugIn(pl.LightningModule):
 from ..t2u.downstreams import Downstream1
 class TransformerFSCLPlugIn(LinearFSCLPlugIn):
     def __init__(self, model_config, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.model_config = model_config
+        super().__init__(model_config, *args, **kwargs)
 
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
@@ -181,21 +180,21 @@ class TransformerFSCLPlugIn(LinearFSCLPlugIn):
 
     def build_embedding_table(self, ref_infos, return_attn=False):
         self.upstream.eval()
-        with torch.no_grad():
-            hiddens, avg_frames_list, phonemes_list = [], [], []
-            for info in ref_infos:
+        hiddens, avg_frames_list, phonemes_list = [], [], []
+        for info in ref_infos:
+            with torch.no_grad():
                 ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
                 ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())  # Unavoidable since we need to match shape in transformer forward.
                 ssl_repr = ssl_repr.detach()
-                ssl_repr = self.downstream(ssl_repr, info["lens"].cpu())
-                hiddens.extend([x1 for x1 in ssl_repr])
-                avg_frames_list.extend(info["avg_frames"])
-                phonemes_list.extend(info["phonemes"])
+            ssl_repr = self.downstream(ssl_repr, info["lens"].cpu())
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+            phonemes_list.extend(info["phonemes"])
             
-            table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
-                                len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
-            
-            table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
-            table = table.squeeze(0)  # n_symbols, dim
-            table[0].fill_(0)
+        table_pre = self.phoneme_query_extractor(hiddens, avg_frames_list, 
+                            len(LANG_ID2SYMBOLS[ref_infos[0]["lang_id"]]), phonemes_list)  # 1, n_symbols, dim
+        
+        table, attn = self.codebook_attention(table_pre, need_weights=return_attn)
+        table = table.squeeze(0)  # n_symbols, dim
+        table[0].fill_(0)
         return table, attn
