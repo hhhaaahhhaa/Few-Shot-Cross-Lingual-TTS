@@ -1,6 +1,7 @@
 from typing import Type
 
-from . system import System
+from .system import System
+from .adaptor import AdaptorSystem
 from . import language
 from . import phoneme_recognition
 from . import t2u
@@ -18,10 +19,14 @@ SYSTEM_SYNTHESIS = {
     "fscl-linear-tune": language.fscl_tune_fastspeech2_class_factory("linear"),
     "fscl-transformer-tune": language.fscl_tune_fastspeech2_class_factory("transformer"),
 
-    "fscl-ada1": language.ada_class_factory(language.TransEmbOrigSystem, ada_stage="matching"),
-    "fscl-ada2": language.ada_class_factory(language.TransEmbOrigSystem, ada_stage="unsup_tuning"),
-    "fscl-ssl_ada1": language.ssl_ada_class_factory(language.TransEmbOrigSystem, ada_stage="matching"),
-    "fscl-ssl_ada2": language.ssl_ada_class_factory(language.TransEmbOrigSystem, ada_stage="unsup_tuning"),
+    "fscl-orig-seg": language.seg_fastspeech2_class_factory("orig"),
+    "fscl-linear-seg": language.seg_fastspeech2_class_factory("linear"),
+    "fscl-transformer-seg": language.seg_fastspeech2_class_factory("transformer"),
+
+    "fscl-ada1": language.ada_class_factory(language.fscl_fastspeech2_class_factory("orig"), ada_stage="matching"),
+    "fscl-ada2": language.ada_class_factory(language.fscl_fastspeech2_class_factory("orig"), ada_stage="unsup_tuning"),
+    "fscl-ssl_ada1": language.ssl_ada_class_factory(language.fscl_fastspeech2_class_factory("orig"), ada_stage="matching"),
+    "fscl-ssl_ada2": language.ssl_ada_class_factory(language.fscl_fastspeech2_class_factory("orig"), ada_stage="unsup_tuning"),
 }
 
 

@@ -8,7 +8,7 @@ from dlhlp_lib.s3prl import S3PRLExtractor
 
 import Define
 from text.define import LANG_ID2SYMBOLS
-from lightning.model.reduction import PhonemeQueryExtractor
+from lightning.model.reduction import PhonemeQueryExtractor, segmental_average
 from ..language.embeddings import SoftMultiAttCodebook2
 from lightning.utils.tool import ssl_match_length
 
@@ -22,6 +22,9 @@ class IFSCLPlugIn(pl.LightningModule):
         raise NotImplementedError
     
     def build_embedding_table(self, ref_infos, return_attn=False, *args, **kwargs):
+        raise NotImplementedError
+    
+    def build_segmental_representation(self, ref_infos, *args, **kwargs):
         raise NotImplementedError
 
     def on_save_checkpoint(self, checkpoint, prefix="fscl", *args, **kwargs):
@@ -66,6 +69,22 @@ class OrigFSCLPlugIn(pl.LightningModule):
         table = table.squeeze(0)  # n_symbols, dim
         table[0].fill_(0)
         return table, attn
+    
+    def build_segmental_representation(self, ref_infos):
+        self.upstream.eval()
+        hiddens, avg_frames_list = [], []
+        for info in ref_infos:
+            with torch.no_grad():
+                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
+                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())  # Unavoidable since we need to match shape when using segmental forward.
+                ssl_repr = ssl_repr.detach()
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+        
+        seg_repr = segmental_average(hiddens, avg_frames_list)        
+        seg_repr, attn = self.codebook_attention(seg_repr, need_weights=False)  # B, L, dim
+
+        return seg_repr, attn
         
     def on_save_checkpoint(self, checkpoint, prefix=""):
         """ Remove pretrained weights in checkpoint to save disk space. """
@@ -137,6 +156,23 @@ class LinearFSCLPlugIn(pl.LightningModule):
         table = table.squeeze(0)  # n_symbols, dim
         table[0].fill_(0)
         return table, attn
+    
+    def build_segmental_representation(self, ref_infos):
+        self.upstream.eval()
+        hiddens, avg_frames_list = [], []
+        for info in ref_infos:
+            with torch.no_grad():
+                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
+                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())  # Unavoidable since we need to match shape when using segmental forward.
+                ssl_repr = ssl_repr.detach()
+            ssl_repr = self.downstream(ssl_repr)
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+        
+        seg_repr = segmental_average(hiddens, avg_frames_list)        
+        seg_repr, attn = self.codebook_attention(seg_repr, need_weights=False)  # B, L, dim
+
+        return seg_repr, attn
         
     def on_save_checkpoint(self, checkpoint, prefix=""):
         """ Remove pretrained weights in checkpoint to save disk space. """

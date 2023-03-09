@@ -10,33 +10,35 @@ from dlhlp_lib.utils.numeric import torch_exist_nan
 import Define
 
 
-class SegmentationLevelAverage(pl.LightningModule):
+def segmental_average(representations: torch.FloatTensor, avg_frames: List[List[int]]):
     """
     Perform segmentation-level average on a batch of speech representations base on segmentations.
     e.g. | 3 2 1 | 5 1 | 6 | 7 8 9 6 | -> [2, 3, 6, 7.5]  
     Output tensor shape is (B, L, *dims).
     """
-    def __init__(self) -> None:
-        super().__init__()
-
-    def forward(self, representations, avg_frames: List[List[int]]):
-        B, _, *dims = representations.shape
-        avg_repr = []
-        for d_list, repr in zip(avg_frames, representations):
-            pos = 0
-            for i, d in enumerate(d_list):
-                if d > 0 and not torch_exist_nan(repr[pos: pos + d]):
-                    repr[:, i] = torch.mean(repr[pos: pos + d], axis=0)
-                else:
-                    repr[:, i] = torch.zeros(dims).to(self.device)
-                pos += d
-            repr = repr[:len(d_list)]  # len(d_list), *dims
-            avg_repr.append(repr)
-        avg_repr = torch.nn.utils.rnn.pad_sequence(avg_repr, batch_first=True)  # B, L, *dims
-        if Define.DEBUG:
-            print("Average representations shape:")
-            print(avg_repr.shape)
-        return avg_repr
+    _, *dims = representations[0].shape
+    device = representations[0].device
+    avg_repr = []
+    for d_list, repr in zip(avg_frames, representations):
+        assert not torch_exist_nan(repr)
+        seg_repr = []
+        pos = 0
+        for i, d in enumerate(d_list):
+            if d > 0:
+                seg_repr.append(torch.mean(repr[pos: pos + d], axis=0))
+            else:
+                seg_repr[i].append(torch.zeros(dims).to(device))
+            pos += d
+            if pos >= len(repr):
+                break
+        assert len(d_list) == len(seg_repr), "Number of segments should match."
+        seg_repr = torch.stack(seg_repr)  # len(d_list), *dims
+        avg_repr.append(seg_repr)
+    avg_repr = torch.nn.utils.rnn.pad_sequence(avg_repr, batch_first=True)  # B, L, *dims
+    if Define.DEBUG:
+        print("Average representations shape:")
+        print(avg_repr.shape)
+    return avg_repr
 
 
 class PhonemeQueryExtractor(pl.LightningModule):

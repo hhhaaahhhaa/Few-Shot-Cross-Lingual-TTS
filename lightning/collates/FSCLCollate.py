@@ -156,14 +156,17 @@ class GeneralFSCLCollate(object):
         output = reprocess(data, idx_arr, mode=mode)
 
         repr_info = {}
+        lang_id = data[0]["lang_id"]
         if mode == "sup":
-            lang_id = data[0]["lang_id"]
             repr_info["n_symbols"] = data[0]["n_symbols"]
-            repr_info["lang_id"] = lang_id
+            repr_info["lang_id"] = LANG_ID2NAME[lang_id]
             repr_info["texts"] = [data[idx]["text"] for idx in idx_arr]
         elif mode == "unsup":
-            repr_info["raw-feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
-            repr_info["avg-frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
+            repr_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
+            repr_info["avg_frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
+            repr_info["lens"] = torch.LongTensor([sum(data[idx]["avg-frames"]) for idx in idx_arr])
+            repr_info["max_len"] = max(repr_info["lens"])
+            repr_info["lang_id"] = LANG_ID2NAME[lang_id]
         else:
             raise NotImplementedError
 

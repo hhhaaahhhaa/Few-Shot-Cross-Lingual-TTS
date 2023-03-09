@@ -49,11 +49,14 @@ def _fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
 
         def setup_tune_mode(self):
             from lightning.utils.freezing import get_norm_params, get_bias_params
-            tune_modules = self.algorithm_config.get("tune_modules", None)
-            if tune_modules is None:
+            tune_modules = self.algorithm_config.get("tune_modules", ["all"])
+            tune_specific = self.algorithm_config.get("tune_specific", "none")
+            if tune_modules == ["all"] and tune_specific == "none":
                 return
-            print("Freezing some parameters...")
+            print("Freezing some parameters:")
+            print(f"Tune modules: {tune_modules}, tune specific: {tune_specific}.")
             mapping = {
+                "all": super().build_optimized_model(),
                 "embedding": self.embedding_model,
                 "encoder": self.model.encoder,
                 "variance_adaptor": self.model.variance_adaptor,
@@ -61,7 +64,6 @@ def _fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
                 "mel_linear": self.model.mel_linear,
                 "postnet": self.model.postnet
             }
-            tune_specific = self.algorithm_config.get("tune_specific", None)
             for param in self.model.parameters():
                 param.requires_grad = False
             for name in tune_modules:
@@ -158,4 +160,6 @@ def fscl_tune_fastspeech2_class_factory(name):
         return _fscl_tune_fastspeech2_class_factory(LinearFSCLPlugIn)
     elif name == "transformer":
         return _fscl_tune_fastspeech2_class_factory(TransformerFSCLPlugIn)
+    else:
+        raise NotImplementedError
         
