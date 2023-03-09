@@ -32,6 +32,7 @@ class OrigFSCLPlugIn(pl.LightningModule):
     def __init__(self, model_config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.model_config = model_config
+        self.build_model()
 
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)
@@ -95,6 +96,7 @@ class LinearFSCLPlugIn(pl.LightningModule):
     def __init__(self, model_config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.model_config = model_config
+        self.build_model()
 
     def build_model(self):
         self.upstream = S3PRLExtractor(Define.UPSTREAM)

@@ -15,9 +15,12 @@ DATA_MODULE = {
     "fscl-ada2": language.FSCLDataModule,
     "fscl-ssl_ada1": language.FSCLDataModule,
     "fscl-ssl_ada2": language.FSCLDataModule,
+    
     "fscl-tune": language.FastSpeech2DataModule,
     "fscl-orig-tune": language.FastSpeech2DataModule,
     "fscl-linear-tune": language.FastSpeech2DataModule,
+    "fscl-transformer-tune": language.FastSpeech2DataModule,
+
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,

@@ -20,7 +20,7 @@ class BaselineTuneSystem(BaselineSystem):
         print(f"Target Language: {self.target_lang_id}.")
 
 
-def fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
+def _fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
     class TransEmbTuneSystem(BaselineSystem):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -38,9 +38,10 @@ def fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
 
             print("Embedding initialization...")
             self.cuda()
-            table, attn = self.fscl.build_embedding_table(ref_infos, return_attn=True)
-            self.attn = attn
-            self.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
+            with torch.no_grad():
+                table, attn = self.fscl.build_embedding_table(ref_infos, return_attn=True)
+                self.attn = attn
+                self.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
             for p in self.embedding_model.parameters():
                 p.requires_grad = True
             self.cpu()
@@ -51,6 +52,7 @@ def fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
             tune_modules = self.algorithm_config.get("tune_modules", None)
             if tune_modules is None:
                 return
+            print("Freezing some parameters...")
             mapping = {
                 "embedding": self.embedding_model,
                 "encoder": self.model.encoder,
@@ -137,7 +139,7 @@ def fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
                 state_dict.pop(k)
             for k in model_state_dict:
                 if k not in state_dict:
-                    if k.split('.')[0] in ["fscl.upstream"]:
+                    if k.startswith("fscl.upstream"):
                         pass
                     else:
                         print("Reinitialized: ", k)
@@ -149,7 +151,11 @@ def fscl_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn]):
     return TransEmbTuneSystem
 
 
-TransEmbOrigTuneSystem = fscl_tune_fastspeech2_class_factory(OrigFSCLPlugIn)
-TransEmbLinearTuneSystem = fscl_tune_fastspeech2_class_factory(LinearFSCLPlugIn)
-TransEmbTransformerTuneSystem = fscl_tune_fastspeech2_class_factory(TransformerFSCLPlugIn)
+def fscl_tune_fastspeech2_class_factory(name):
+    if name == "orig":
+        return _fscl_tune_fastspeech2_class_factory(OrigFSCLPlugIn)
+    elif name == "linear":
+        return _fscl_tune_fastspeech2_class_factory(LinearFSCLPlugIn)
+    elif name == "transformer":
+        return _fscl_tune_fastspeech2_class_factory(TransformerFSCLPlugIn)
         
