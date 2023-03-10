@@ -95,7 +95,7 @@ class OrigFSCLPlugIn(pl.LightningModule):
         state_dict = checkpoint["state_dict"]
         new_state_dict = OrderedDict()
         for k in state_dict:
-            if k.split('.')[0] in remove_list:
+            if k.startswith(tuple(remove_list)):
                 continue
             new_state_dict[k] = state_dict[k]
         checkpoint["state_dict"] = new_state_dict
@@ -183,7 +183,7 @@ class LinearFSCLPlugIn(pl.LightningModule):
         state_dict = checkpoint["state_dict"]
         new_state_dict = OrderedDict()
         for k in state_dict:
-            if k.split('.')[0] in remove_list:
+            if k.startswith(tuple(remove_list)):
                 continue
             new_state_dict[k] = state_dict[k]
         checkpoint["state_dict"] = new_state_dict

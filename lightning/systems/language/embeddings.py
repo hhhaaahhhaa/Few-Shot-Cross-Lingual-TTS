@@ -89,7 +89,7 @@ class SoftMultiAttCodebook2(nn.Module):
 
         self.attention = MultiheadAttention(temperature=(self.d_word_vec // self.num_heads) ** 0.5)
 
-        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None and Define.LAYER_IDX is not None:            
+        if Define.UPSTREAM != "mel" and Define.UPSTREAM is not None:            
             if Define.LAYER_IDX is not None:
                 weights = torch.ones(1, Define.UPSTREAM_LAYER, 1) * float('-inf')
                 weights[0][Define.LAYER_IDX][0] = 10.0
