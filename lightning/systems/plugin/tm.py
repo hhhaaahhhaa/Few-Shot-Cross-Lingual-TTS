@@ -41,17 +41,17 @@ class FilterLinear(nn.Module):
         self.act = nn.ReLU()
 
     def build_filter(self, x, alpha):
-        if alpha is None:
-            return x
         shape = [1] * x.dim()
         shape[-1] = -1
         n_filter = int(self.prob * self.d_out)
         filter = alpha.view(tuple(shape))
-        filter[..., n_filter:] = float("inf")
+        filter[..., -n_filter:] = float("inf")
         return (1 - self.min_ratio) * F.sigmoid(filter) + self.min_ratio
 
     def forward(self, x, alpha=None):
         x = self.linear(x)
+        if alpha is None:
+            return self.act(x)
         filter = self.build_filter(x, alpha)
         return self.act(x * filter)
 
