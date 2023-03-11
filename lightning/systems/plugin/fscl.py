@@ -31,7 +31,7 @@ class IFSCLPlugIn(pl.LightningModule):
         raise NotImplementedError    
 
 
-class OrigFSCLPlugIn(pl.LightningModule):
+class OrigFSCLPlugIn(IFSCLPlugIn):
     def __init__(self, model_config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.model_config = model_config
@@ -108,7 +108,7 @@ class OrigFSCLPlugIn(pl.LightningModule):
 
 from ..language.embeddings import SoftMultiAttCodebook
 from ..t2u.downstreams import LinearDownstream
-class LinearFSCLPlugIn(pl.LightningModule):
+class LinearFSCLPlugIn(IFSCLPlugIn):
     """
     Weighted sum + Linear, which should be identical with OrigFSCLPlugIn
     """

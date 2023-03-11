@@ -30,6 +30,11 @@ SYSTEM_SYNTHESIS = {
 }
 
 
+SYSTEM_DUAL = {
+    "dual-orig": language.dual_fastspeech2_class_factory("orig"),
+}
+
+
 SYSTEM_PR = {
     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
@@ -65,6 +70,7 @@ SYSTEM_T2U = {
 
 SYSTEM = {
     **SYSTEM_SYNTHESIS,
+    **SYSTEM_DUAL,
     # **SYSTEM_PR,
     **SYSTEM_T2U
 }

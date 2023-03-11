@@ -7,6 +7,7 @@ from dlhlp_lib.audio import AUDIO_CONFIG
 from dlhlp_lib.utils.tool import get_mask_from_lengths
 
 from lightning.model import FastSpeech2ADALoss, ADAEncoder
+from lightning.utils.tool import flat_merge_dict
 
 
 class FastSpeech2ADAPlugIn(pl.LightningModule):
@@ -223,14 +224,6 @@ def ssl_ada_class_factory(BaseClass, ada_stage: str):  # Class factory
                 checkpoint.pop("optimizer_states", None)
 
     return TransEmbSSLADASystem
-
-
-def flat_merge_dict(d):
-    res = {}
-    for k, v in d.items():
-        for name, val in v.items():
-            res[f"{k}/{name}"] = val
-    return res
 
 
 def freeze_non_norm_layer(model):

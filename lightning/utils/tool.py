@@ -260,3 +260,11 @@ def ssl_match_length(inputs, target_len: int):
         factors[1] = label_len - input_len
         inputs = torch.cat((inputs, pad_vec.repeat(*factors)), dim=1)  # (batch_size, seq_len, *dim), where seq_len == target_len
     return inputs
+
+
+def flat_merge_dict(d):
+    res = {}
+    for k, v in d.items():
+        for name, val in v.items():
+            res[f"{k}/{name}"] = val
+    return res
