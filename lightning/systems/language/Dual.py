@@ -24,12 +24,15 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
             }
             self.bs = self.train_config["optimizer"]["batch_size"]
         
+        def setup(self, stage=None):
+            self.tm.codebook_bind(self.fscl.codebook_attention)
+            
         def build_model(self):
             self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
             self.loss_func = FastSpeech2Loss(self.model_config)
             self.fscl = FSCLPlugInClass(self.model_config)
             # this requires fscl class to equip a codebook module
-            self.tm = TMPlugInClass(self.data_configs, self.model_config["text_matching"], codebook_bind=self.fscl.codebook_attention)
+            self.tm = TMPlugInClass(self.data_configs, self.model_config["text_matching"])
 
         def build_optimized_model(self):
             # Currently optimize tm only for experimental check
@@ -55,15 +58,16 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
             return loss_dict, output, seg_repr
         
         def common_tm_step(self, seg_repr, batch, batch_idx, train=True):
-            seg_repr_clustered = self.tm.cluster(seg_repr)
-            c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
-
             labels, _ = batch
+            seg_repr_clustered = self.tm.cluster(seg_repr)
+            # print(seg_repr.shape, seg_repr_clustered.shape)
+            c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
             output = self.tm(labels[3], labels[4])
+            # print(seg_repr.shape, output.shape)
             m_loss = self.tm.match_loss_func(seg_repr, output, labels[4])
 
             loss_dict = {
-                "Total Loss": c_loss + m_loss,
+                "Total Loss": 0.1 * c_loss + m_loss,
                 "Cluster Loss": c_loss,
                 "Match Loss": m_loss,
             }

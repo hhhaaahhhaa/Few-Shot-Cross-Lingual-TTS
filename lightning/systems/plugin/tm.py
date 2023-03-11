@@ -44,8 +44,9 @@ class FilterLinear(nn.Module):
         shape = [1] * x.dim()
         shape[-1] = -1
         n_filter = int(self.prob * self.d_out)
-        filter = alpha.view(tuple(shape))
-        filter[..., -n_filter:] = float("inf")
+        alpha = alpha.view(tuple(shape))
+        filter = torch.ones_like(alpha) * float("inf")
+        filter[..., -n_filter:] = alpha[..., -n_filter:]
         return (1 - self.min_ratio) * F.sigmoid(filter) + self.min_ratio
 
     def forward(self, x, alpha=None):
@@ -57,40 +58,48 @@ class FilterLinear(nn.Module):
 
 
 class TMPlugIn(ITextMatchingPlugIn):
-    def __init__(self, data_configs, model_config, codebook_bind: SoftMultiAttCodebook, *args, **kwargs) -> None:
+    def __init__(self, data_configs, model_config, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.data_configs = data_configs
         self.model_config = model_config
         self.build_model()
-        self.codebook_attention.emb_banks = codebook_bind.emb_banks  # bind
+
+    def codebook_bind(self, module: SoftMultiAttCodebook):
+        print("Codebook bind...")
+        self.codebook_attention.emb_banks = module.emb_banks  # bind
+        self.codebook_attention.emb_banks.requires_grad = False
 
     def build_model(self):
         encoder_dim = self.model_config["transformer"]["encoder_hidden"]
         self.embedding_model = MultilingualEmbedding(
             id2symbols=build_id2symbols(self.data_configs), dim=encoder_dim)
-        self.encoder = TMEncoder(self.model_config)
+        self.encoder = TMEncoder(1, self.model_config)  # d_in is not important here since we will use embed=False
 
         self.n_layers = self.model_config["cluster"]["layer"]
         self.alpha = nn.Parameter(torch.randn(self.n_layers))
         self.layers = nn.ModuleList()
-        for i in range(len(self.n_layers)):
+        for i in range(self.n_layers):
             if i != self.n_layers - 1:
                 self.layers.append(FilterLinear(encoder_dim, encoder_dim, self.model_config["cluster"]["min_ratio"]))
             else:
                 self.layers.append(nn.Linear(encoder_dim, encoder_dim))
         
         self.codebook_attention = SoftMultiAttCodebook(
-            codebook_size=self.model_config["codebook_size"],
+            codebook_size=self.model_config["codebook"]["codebook_size"],
             embed_dim=self.model_config["transformer"]["encoder_hidden"],
-            num_heads=self.model_config["downstream"]["transformer"]["nhead"],
+            num_heads=self.model_config["codebook"]["nhead"],
         )
 
     def build_optimized_model(self):
         return self
 
     def cluster(self, x):
+        # print(self.alpha)
         for i, layer in enumerate(self.layers):
-            x = layer(x, self.alpha[i])
+            if i == self.n_layers - 1:
+                x = layer(x)
+            else:
+                x = layer(x, self.alpha[i])
         return x
     
     def forward(self, x, lengths, lang_args=None):

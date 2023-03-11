@@ -77,7 +77,7 @@ class UnitDataModule(pl.LightningDataModule):
             shuffle=True,
             drop_last=True,
             num_workers=Define.MAX_WORKERS,
-            collate_fn=self.collate.collate_fn(False, mode="sup"), 
+            collate_fn=self.collate.collate_fn(False, re_id=True, mode="sup"), 
         )
         return self.train_loader
 
@@ -89,6 +89,6 @@ class UnitDataModule(pl.LightningDataModule):
             shuffle=False,
             drop_last=False,
             num_workers=0,
-            collate_fn=self.collate.collate_fn(False, mode="sup"),
+            collate_fn=self.collate.collate_fn(False, re_id=True, mode="sup"),
         )
         return self.val_loader

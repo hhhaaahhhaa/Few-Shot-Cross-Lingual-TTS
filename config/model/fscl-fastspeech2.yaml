@@ -8,6 +8,16 @@ downstream:
     dropout: 0.2
 
 text_matching:
+  codebook:
+    codebook_size: 128
+    nhead: 4
+  downstream:
+    transformer:
+      d_model: 256
+      nhead: 4
+      layer: 2
+      dim_feedforward: [256, 256]
+      dropout: 0.2
   cluster:
     layer: 3
     prob: 0.25
@@ -19,6 +29,7 @@ text_matching:
     conv_filter_size: 1024
     conv_kernel_size: [9, 1]
     encoder_dropout: 0.2
+  max_seq_len: 1500
   
 transformer:
   encoder_layer: 4

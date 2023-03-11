@@ -23,15 +23,15 @@ def segmental_average(representations: torch.FloatTensor, avg_frames: List[List[
         assert not torch_exist_nan(repr)
         seg_repr = []
         pos = 0
-        for i, d in enumerate(d_list):
+        for d in d_list:
             if d > 0:
+                if pos >= len(repr):
+                    break  # CAUTION: slice out of index
                 seg_repr.append(torch.mean(repr[pos: pos + d], axis=0))
             else:
-                seg_repr[i].append(torch.zeros(dims).to(device))
+                seg_repr.append(torch.zeros(dims).to(device))
             pos += d
-            if pos >= len(repr):
-                break
-        assert len(d_list) == len(seg_repr), "Number of segments should match."
+        assert len(d_list) == len(seg_repr), f"Number of segments should match. {len(d_list)} != {len(seg_repr)}, {sum(d_list)} > {len(repr)}"
         seg_repr = torch.stack(seg_repr)  # len(d_list), *dims
         avg_repr.append(seg_repr)
     avg_repr = torch.nn.utils.rnn.pad_sequence(avg_repr, batch_first=True)  # B, L, *dims
@@ -70,17 +70,17 @@ class PhonemeQueryExtractor(pl.LightningModule):
             pos = 0
             for p, d in zip(phoneme, d_list):
                 if d > 0:
+                    # CAUTION: Torch slicing return [] instead of raising error when index is out of range. May cause NaN in later operations.
+                    # Therefore we'll manually check it and break.
+                    # Also we need d > 0 or else slicing will also return [].
+                    if pos >= len(repr):
+                        break
                     if self.two_stage:
                         table[int(p)].append(repr[pos: pos + d].mean(dim=0))
                     else:
                         for r in repr[pos: pos + d]:
                             table[int(p)].append(r)
                 pos += d
-                # CAUTION: Torch slicing return [] instead of raising error when index is out of range. May cause NaN in later operations.
-                # Therefore we'll manually check it and break.
-                # Also we need d > 0 or else slicing will also return [].
-                if pos >= len(repr):
-                    break
 
         phn_query = self.reduction(list(range(n_symbols)), table, dims)
         phn_query = phn_query.unsqueeze(0)  # 1, n_symbols, layer, dim
