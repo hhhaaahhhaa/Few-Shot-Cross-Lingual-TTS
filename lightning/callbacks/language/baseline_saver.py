@@ -161,6 +161,62 @@ class Saver(BaseSaver):
 
         synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
 
+    # New logging functions
+    def plot_tensor(self, x, title, x_labels: List[str], y_labels: List[str]):
+        "Wrapper method for calling visualizer to plot."
+        info = {
+            "title": title,
+            "x_labels": x_labels,
+            "y_labels": y_labels,
+            "attn": x.detach().cpu().numpy()
+        }
+        fig = self.visualizer.plot(info)
+        return fig
+    
+    def log_1D_tensor(self, logger, x, step, title, stage="val"):
+        """ Visualize any 1D tensors """
+        fig = self.plot_tensor(x.view(1, -1), title, [str(i) for i in range(len(x))], ["Weight"])
+        figure_name = f"{stage}/{title}/step_{step}"
+        if isinstance(logger, pl.loggers.CometLogger):
+            logger.experiment.log_figure(
+                figure_name=figure_name,
+                figure=fig,
+                step=step,
+            )
+        plt.close(fig)
+
+    def log_2D_tensor(self, logger, x, step, title, x_labels: List[str], y_labels: List[str], stage="val"):
+        """ Visualize any 2D tensors """
+        fig = self.plot_tensor(x, title, x_labels, y_labels)
+        figure_name = f"{stage}/{title}/step_{step}"
+        if isinstance(logger, pl.loggers.CometLogger):
+            logger.experiment.log_figure(
+                figure_name=figure_name,
+                figure=fig,
+                step=step,
+            )
+        plt.close(fig)
+        
+    def log_attn(self, logger, attn, batch_idx, step, title, x_labels: List[str], y_labels: List[str], stage="val"):
+        """
+        Visualize 2D attention for all heads for a sample.
+        attn: Tensor with size nH, len(y_labels), len(x_labels) (Be careful need to be opposite)
+        """
+        nH, ly, lx = attn.shape
+        assert lx == len(x_labels)
+        assert ly == len(y_labels)
+
+        for hid in range(nH):
+            fig = self.plot_tensor(attn[hid], f"Head-{hid}", x_labels, y_labels)
+            figure_name = f"{stage}/{title}/step_{step}_{batch_idx:03d}_h{hid}"
+            if isinstance(logger, pl.loggers.CometLogger):
+                logger.experiment.log_figure(
+                    figure_name=figure_name,
+                    figure=fig,
+                    step=step,
+                )
+            plt.close(fig)
+
     # For TransEmb System
     def log_codebook_attention(self, logger, attn, lang_id, batch_idx, step, stage="val"):
         """
@@ -170,39 +226,39 @@ class Saver(BaseSaver):
         lang_id = LANG_ID2NAME[lang_id]
         symbols = self.id2symbols[lang_id]
         assert n_symbols == len(symbols)
+        x_labels = [str(i) for i in range(codebook_size)]
+        y_labels = symbols
+        self.log_attn(logger, attn[0], batch_idx, step, "codebook", x_labels, y_labels, stage=stage)
 
-        for hid in range(nH):
-            info = {
-                "title": f"Head-{hid}",
-                "x_labels": [str(i) for i in range(codebook_size)],
-                "y_labels": symbols,
-                "attn": attn[0][hid].detach().cpu().numpy()
-            }
+        # Deprecated
+        # for hid in range(nH):
+        #     info = {
+        #         "title": f"Head-{hid}",
+        #         "x_labels": [str(i) for i in range(codebook_size)],
+        #         "y_labels": symbols,
+        #         "attn": attn[0][hid].detach().cpu().numpy()
+        #     }
             
-            fig = self.visualizer.plot(info)
-            figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}_h{hid}"
-            if isinstance(logger, pl.loggers.CometLogger):
-                logger.experiment.log_figure(
-                    figure_name=figure_name,
-                    figure=fig,
-                    step=step,
-                )
-            plt.close(fig)
+        #     fig = self.visualizer.plot(info)
+        #     figure_name = f"{stage}/codebook/step_{step}_{batch_idx:03d}_h{hid}"
+        #     if isinstance(logger, pl.loggers.CometLogger):
+        #         logger.experiment.log_figure(
+        #             figure_name=figure_name,
+        #             figure=fig,
+        #             step=step,
+        #         )
+        #     plt.close(fig)
     
     def log_layer_weights(self, logger, layer_weights, step, stage="val"):
-        info = {
-            "title": "Layer weights",
-            "x_labels": [str(i) for i in range(len(layer_weights))],
-            "y_labels": ["Weight"],
-            "attn": layer_weights.view(1, -1).detach().cpu().numpy()
-        }
-        
-        fig = self.visualizer.plot(info)
-        figure_name = f"{stage}/weights/step_{step}"
-        if isinstance(logger, pl.loggers.CometLogger):
-            logger.experiment.log_figure(
-                figure_name=figure_name,
-                figure=fig,
-                step=step,
-            )
-        plt.close(fig)
+        self.log_1D_tensor(self, logger, layer_weights, step, "Layer weights", stage=stage)
+
+        # Deprecated
+        # fig = self.visualizer.plot(info)
+        # figure_name = f"{stage}/weights/step_{step}"
+        # if isinstance(logger, pl.loggers.CometLogger):
+        #     logger.experiment.log_figure(
+        #         figure_name=figure_name,
+        #         figure=fig,
+        #         step=step,
+        #     )
+        # plt.close(fig)

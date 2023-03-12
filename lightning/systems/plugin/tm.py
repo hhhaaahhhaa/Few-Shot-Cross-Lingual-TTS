@@ -42,6 +42,7 @@ class FilterLinear(nn.Module):
 
     def build_filter(self, x, alpha):
         shape = [1] * x.dim()
+        shape[0] = x.shape[0]
         shape[-1] = -1
         n_filter = int(self.prob * self.d_out)
         alpha = alpha.view(tuple(shape))
@@ -76,7 +77,7 @@ class TMPlugIn(ITextMatchingPlugIn):
         self.encoder = TMEncoder(1, self.model_config)  # d_in is not important here since we will use embed=False
 
         self.n_layers = self.model_config["cluster"]["layer"]
-        self.alpha = nn.Parameter(torch.randn(self.n_layers))
+        self.alpha = nn.Parameter(torch.randn(100, self.n_layers - 1))
         self.layers = nn.ModuleList()
         for i in range(self.n_layers):
             if i != self.n_layers - 1:
@@ -93,13 +94,12 @@ class TMPlugIn(ITextMatchingPlugIn):
     def build_optimized_model(self):
         return self
 
-    def cluster(self, x):
-        # print(self.alpha)
+    def cluster(self, x, lang_args):
         for i, layer in enumerate(self.layers):
             if i == self.n_layers - 1:
                 x = layer(x)
             else:
-                x = layer(x, self.alpha[i])
+                x = layer(x, self.alpha[lang_args, i])
         return x
     
     def forward(self, x, lengths, lang_args=None):
