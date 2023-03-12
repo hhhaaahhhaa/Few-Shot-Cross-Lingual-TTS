@@ -25,6 +25,7 @@ DATA_MODULE = {
     "fscl-transformer-tune": language.FastSpeech2DataModule,
 
     "dual-orig": language.UnitDataModule,
+    "dual-transformer": language.UnitDataModule,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,

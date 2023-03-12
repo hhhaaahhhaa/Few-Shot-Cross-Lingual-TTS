@@ -236,3 +236,20 @@ class TransformerFSCLPlugIn(LinearFSCLPlugIn):
         table = table.squeeze(0)  # n_symbols, dim
         table[0].fill_(0)
         return table, attn
+    
+    def build_segmental_representation(self, ref_infos):
+        self.upstream.eval()
+        hiddens, avg_frames_list = [], []
+        for info in ref_infos:
+            with torch.no_grad():
+                ssl_repr, _ = self.upstream.extract(info["raw_feat"])  # B, L, n_layers, dim
+                ssl_repr = ssl_match_length(ssl_repr, info["max_len"].item())  # Unavoidable since we need to match shape when using segmental forward.
+                ssl_repr = ssl_repr.detach()
+            ssl_repr = self.downstream(ssl_repr, info["lens"].cpu())
+            hiddens.extend([x1 for x1 in ssl_repr])
+            avg_frames_list.extend(info["avg_frames"])
+        
+        seg_repr = segmental_average(hiddens, avg_frames_list)        
+        seg_repr, attn = self.codebook_attention(seg_repr, need_weights=False)  # B, L, dim
+
+        return seg_repr, attn

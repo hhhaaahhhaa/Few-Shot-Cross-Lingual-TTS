@@ -32,6 +32,7 @@ SYSTEM_SYNTHESIS = {
 
 SYSTEM_DUAL = {
     "dual-orig": language.dual_fastspeech2_class_factory("orig"),
+    "dual-transformer": language.dual_fastspeech2_class_factory("transformer"),
 }
 
 

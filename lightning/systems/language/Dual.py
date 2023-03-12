@@ -7,15 +7,14 @@ from lightning.build import build_all_speakers
 from lightning.systems import System
 from lightning.model import FastSpeech2Loss, FastSpeech2
 from lightning.callbacks.language.baseline_saver import Saver
-from ..plugin.fscl import IFSCLPlugIn, OrigFSCLPlugIn
+from ..plugin.fscl import IFSCLPlugIn, OrigFSCLPlugIn, TransformerFSCLPlugIn
 from ..plugin.tm import ITextMatchingPlugIn, TMPlugIn
 from lightning.utils.tool import flat_merge_dict
-# from ..t2u.schedules import mix_schedule as schedule_f
-from ..t2u.schedules import no_schedule as schedule_f
+from ..t2u.schedules import mix_schedule, no_schedule, zero_schedule
 from text.define import LANG_ID2NAME
 
 
-def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugInClass: Type[ITextMatchingPlugIn]):
+def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugInClass: Type[ITextMatchingPlugIn], variation="base"):
     class DualSystem(System):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -39,7 +38,14 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
 
         def build_optimized_model(self):
             # Currently optimize tm only for experimental check
-            return nn.ModuleList([self.model, self.tm.build_optimized_model()])
+            if variation == "base":
+                return nn.ModuleList([self.model, self.tm.build_optimized_model()]) + self.fscl.build_optimized_model()
+            elif variation == "fix_fscl":
+                return nn.ModuleList([self.model, self.tm.build_optimized_model()])
+            elif variation == "unsup_tune":
+                return nn.ModuleList([self.model, self.tm.build_optimized_model()])
+            else:
+                raise NotImplementedError
 
         def build_saver(self):
             self.saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
@@ -61,37 +67,49 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
         
         def common_tm_step(self, seg_repr, batch, batch_idx, train=True):
             labels, _ = batch
-            seg_repr_clustered = self.tm.cluster(seg_repr, lang_args=labels[-1])
+            # seg_repr_clustered = self.tm.cluster(seg_repr, lang_args=labels[-1])
             # print(seg_repr.shape, seg_repr_clustered.shape)
-            c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
+            # c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
             output = self.tm(labels[3], labels[4])
             # print(seg_repr.shape, output.shape)
+            seg_repr = seg_repr.clone().detach()
             m_loss = self.tm.match_loss_func(seg_repr, output, labels[4])
 
             loss_dict = {
-                "Total Loss": + m_loss,
-                "Cluster Loss": c_loss,
+                "Total Loss": m_loss,  # Currently close c_loss (unstable)
+                # "Cluster Loss": c_loss,
                 "Match Loss": m_loss,
             }
             return loss_dict, output
         
-        def mix_aug(self, seg_repr, tm_output):
+        def mix_ratio(self):
+            return zero_schedule(self.global_step + 1)
+        
+        def mix_aug(self, seg_repr, tm_output, temp=1.0):
             alpha = torch.randn(seg_repr.shape[:-1]).to(self.device)
-            alpha = F.sigmoid(alpha).unsqueeze(-1)
+            alpha = F.sigmoid(alpha / temp).unsqueeze(-1)
             # print(alpha.shape, seg_repr.shape, tm_output.shape)
             mixed = (1 - alpha * seg_repr) + alpha * tm_output
-            ratio = schedule_f(self.global_step + 1)
-            return ratio * seg_repr + (1 - ratio) * mixed
+            return self.mix_ratio() * seg_repr + (1 - self.mix_ratio()) * mixed
 
         def common_step(self, batch, batch_idx, train=True):
             _, ref_info = batch
-            with torch.no_grad():
+            if variation == "fix_fscl":
+                with torch.no_grad():
+                    seg_repr, attn_fscl = self.fscl.build_segmental_representation([ref_info])
+                    seg_repr = seg_repr.detach()
+            else:
                 seg_repr, _ = self.fscl.build_segmental_representation([ref_info])
-            tm_loss_dict, tm_output = self.common_tm_step(seg_repr, batch, batch_idx, train)
+            
+            tm_loss_dict, tm_output = self.common_tm_step(seg_repr, batch, batch_idx, train)  # be careful that seg_repr collapse
             if not train:
                 u2s_loss_dict, u2s_output = self.common_u2s_step(tm_output, batch, batch_idx, train)
             else:
-                seg_repr_aug = self.mix_aug(seg_repr, tm_output)
+                # Unsup Tune
+                # temp = 0.01 + mix_schedule(self.global_step + 1)
+                temp = 0.01  # Means that 68.27% of mix ratio is between sigmoid(-1 / temp) and sigmoid(1 / temp)
+
+                seg_repr_aug = self.mix_aug(seg_repr, tm_output, temp=temp)
                 u2s_loss_dict, u2s_output = self.common_u2s_step(seg_repr_aug, batch, batch_idx, train)
            
             loss_dict = flat_merge_dict({
@@ -99,7 +117,7 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
                 "TM": tm_loss_dict
             })
 
-            loss_dict["Total Loss"] = schedule_f(self.global_step + 1) * tm_loss_dict["Total Loss"] + u2s_loss_dict["Total Loss"]
+            loss_dict["Total Loss"] = self.mix_ratio() * tm_loss_dict["Total Loss"] + u2s_loss_dict["Total Loss"]
             return loss_dict, u2s_output
 
         def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
@@ -114,7 +132,7 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
             # Log metrics to CometLogger
             loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
             self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
-            self.log("MixAug ratio", schedule_f(self.global_step + 1), sync_dist=True)
+            self.log("MixAug ratio", self.mix_ratio(), sync_dist=True)
             return {'loss': train_loss_dict["Total Loss"], 'losses': train_loss_dict, 'output': output, '_batch': batch[0]}
 
         def validation_step(self, batch, batch_idx):
@@ -188,5 +206,7 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
 def dual_fastspeech2_class_factory(name):
     if name == "orig":
         return _dual_fastspeech2_class_factory(OrigFSCLPlugIn, TMPlugIn)
+    elif name == "transformer":
+        return _dual_fastspeech2_class_factory(TransformerFSCLPlugIn, TMPlugIn)
     else:
         raise NotImplementedError
