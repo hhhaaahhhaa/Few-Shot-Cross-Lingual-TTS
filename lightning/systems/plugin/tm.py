@@ -48,7 +48,7 @@ class FilterLinear(nn.Module):
         alpha = alpha.view(tuple(shape))
         filter = torch.ones_like(alpha) * float("inf")
         filter[..., -n_filter:] = alpha[..., -n_filter:]
-        return (1 - self.min_ratio) * F.sigmoid(filter) + self.min_ratio
+        return (1 - self.min_ratio) * torch.sigmoid(filter) + self.min_ratio
 
     def forward(self, x, alpha=None):
         x = self.linear(x)

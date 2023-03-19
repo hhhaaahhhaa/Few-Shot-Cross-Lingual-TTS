@@ -168,6 +168,12 @@ def main(args, configs):
     #         "unsup": data_configs,
     #     }
 
+    # TODO: need to enable data configs with reference when tuning with a better way
+    tune_flag = args.tune
+    if tune_flag:
+        reference_data_configs = [data_configs[0]]
+        if len(data_configs) > 1:  # if multiple configs then separate the first config to be reference
+            data_configs = data_configs[1:]
     datamodule = get_datamodule(algorithm_config["type"])(
         data_configs, model_config, train_config, algorithm_config, log_dir, result_dir
     )
@@ -202,9 +208,8 @@ def main(args, configs):
         trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
 
         # Tune is viewed as tune_init + train
-        tune_flag = args.tune
         if tune_flag:
-            model.tune_init(data_configs)
+            model.tune_init(reference_data_configs)
         trainer.fit(model, datamodule=datamodule)
 
     # TODO: Somewhat dirty, to be refactored

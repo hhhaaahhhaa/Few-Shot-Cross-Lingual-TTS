@@ -87,7 +87,7 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
         
         def mix_aug(self, seg_repr, tm_output, temp=1.0):
             alpha = torch.randn(seg_repr.shape[:-1]).to(self.device)
-            alpha = F.sigmoid(alpha / temp).unsqueeze(-1)
+            alpha = torch.sigmoid(alpha / temp).unsqueeze(-1)
             # print(alpha.shape, seg_repr.shape, tm_output.shape)
             mixed = (1 - alpha * seg_repr) + alpha * tm_output
             return self.mix_ratio() * seg_repr + (1 - self.mix_ratio()) * mixed
@@ -140,7 +140,7 @@ def _dual_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugIn
 
             if batch_idx == 0:
                 self.saver.log_2D_tensor(
-                    self.logger, F.sigmoid(self.tm.alpha[:10]).data, self.global_step + 1, "alpha",
+                    self.logger, torch.sigmoid(self.tm.alpha[:10]).data, self.global_step + 1, "alpha",
                     x_labels=[str(i) for i in range(self.tm.alpha.shape[1])],
                     y_labels=[LANG_ID2NAME[i] for i in range(10)], 
                     stage="val"

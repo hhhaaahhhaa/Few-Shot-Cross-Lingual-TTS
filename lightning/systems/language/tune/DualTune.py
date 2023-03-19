@@ -5,6 +5,7 @@ from typing import Type
 
 from dlhlp_lib.utils.tool import get_mask_from_lengths
 
+import Define
 from lightning.build import build_all_speakers
 from lightning.systems import System
 from lightning.model import FastSpeech2Loss, FastSpeech2
@@ -55,7 +56,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             self.fscl.phoneme_query_extractor.reduction.register_forward_hook(_hook)
             
             def _hook2(module, input, output):
-                self.hooks["seg_repr"] = input.clone().detach()
+                self.hooks["seg_repr"] = input[0][:, :, Define.LAYER_IDX].clone().detach()
             self.fscl.codebook_attention.register_forward_hook(_hook2)
 
         def tune_init(self, data_configs):
@@ -64,13 +65,8 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             self.target_lang_id = ref_infos[0]["lang_id"]
             print(f"Target Language: {self.target_lang_id}.")
 
-            self.build_hooks()
-            self.reference = {
-                "unused_ids": self.hooks["unused_ids"],
-                "centers": self.hooks["phoneme_query"][:, 24],
-            }
-
             print("Embedding initialization...")
+            self.build_hooks()
             self.cuda()
             with torch.no_grad():
                 table, attn = self.fscl.build_embedding_table(ref_infos, return_attn=True)
@@ -78,6 +74,12 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
                 self.tm.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
             for p in self.tm.embedding_model.parameters():
                 p.requires_grad = True
+            
+            self.reference = {
+                "unused_ids": self.hooks["unused_ids"],
+                "centers": self.hooks["phoneme_query"][:, 24],
+            }
+
             self.cpu()
 
         def build_optimized_model(self):
@@ -156,12 +158,14 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
                 # Logging
                 length_mask = get_mask_from_lengths(batch[0][4]).to(self.device)
                 denom = torch.sum(~length_mask)
-                numer = torch.sum(torch.logical_and(~length_mask, ~mask))
+                numer = torch.sum((~length_mask) & (~mask))
                 self.log("PL threshold", threshold, sync_dist=True)
                 self.log("PL ratio", numer / max(denom, 1), sync_dist=True)
                 correct = (batch[0][3] == pseudo_idxs)
-                numer2 = torch.logical_and(~length_mask, correct)
+                numer2 = torch.sum((~length_mask) & (~mask) & correct)
                 self.log("PL rccuracy", numer2 / max(numer, 1), sync_dist=True)
+                # print(denom, numer, numer2)
+                # input()
 
             loss_dict = flat_merge_dict({
                 "U2S": u2s_loss_dict,
@@ -169,7 +173,6 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             })
 
             loss_dict["Total Loss"] = 0.0 * tm_loss_dict["Total Loss"] + u2s_loss_dict["Total Loss"]
-            input()
             return loss_dict, u2s_output
 
         def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
@@ -191,7 +194,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
 
             if batch_idx == 0:
                 self.saver.log_2D_tensor(
-                    self.logger, F.sigmoid(self.tm.alpha[:10]).data, self.global_step + 1, "alpha",
+                    self.logger, torch.sigmoid(self.tm.alpha[:10]).data, self.global_step + 1, "alpha",
                     x_labels=[str(i) for i in range(self.tm.alpha.shape[1])],
                     y_labels=[LANG_ID2NAME[i] for i in range(10)], 
                     stage="val"
