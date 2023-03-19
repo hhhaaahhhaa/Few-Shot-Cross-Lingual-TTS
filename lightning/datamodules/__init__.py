@@ -26,6 +26,7 @@ DATA_MODULE = {
 
     "dual-orig": language.UnitDataModule,
     "dual-transformer": language.UnitDataModule,
+    "dual-orig-tune": language.UnitDataModule,
 
     "pr-ssl-linear-tune": phoneme_recognition.SSLPRDataModule,
     "pr-ssl-baseline": phoneme_recognition.SSLPRDataModule,

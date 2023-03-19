@@ -102,10 +102,10 @@ class TMPlugIn(ITextMatchingPlugIn):
                 x = layer(x, self.alpha[lang_args, i])
         return x
     
-    def forward(self, x, lengths, lang_args=None):
+    def forward(self, x, lengths, lang_args=None, mask=None):
         # TODO: make it lanugage dependent
         emb_texts = self.embedding_model(x)
-        x = self.encoder(emb_texts, lengths, embed=False)
+        x = self.encoder(emb_texts, lengths, embed=False, mask=mask)
         output, _ = self.codebook_attention(x)
         return output
 

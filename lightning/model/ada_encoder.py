@@ -18,8 +18,10 @@ class ADAEncoder(pl.LightningModule):
         self.embedding = nn.Linear(d_in, encoder_dim)
         self.encoder = Encoder2(config)
 
-    def forward(self, x, lengths, embed=True):
+    def forward(self, x, lengths, embed=True, mask=None):
         if embed:
             x = self.embedding(x)
-        mask = get_mask_from_lengths(lengths).to(self.device)
+        final_mask = get_mask_from_lengths(lengths).to(self.device)
+        if mask is not None:
+            final_mask = torch.logical_or(final_mask, mask)
         return self.encoder(x, mask)
