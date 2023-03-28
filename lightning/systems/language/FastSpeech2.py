@@ -131,11 +131,11 @@ class BaselineSystem(System):
         else:
             lang_args = None
         texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
-        emb_texts = self.embedding_model(texts, symbol_id)
         src_lens = torch.LongTensor([len(text)]).to(self.device)
         max_src_len = max(src_lens)
         
         with torch.no_grad():
+            emb_texts = self.embedding_model(texts, symbol_id)
             output = self.model(spk_args, emb_texts, src_lens, max_src_len, lang_args=lang_args, average_spk_emb=True)
 
         return output

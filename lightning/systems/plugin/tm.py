@@ -104,8 +104,9 @@ class TMPlugIn(ITextMatchingPlugIn):
                 x = layer(x, self.alpha[lang_args, i])
         return x
     
-    def forward(self, x, lengths, lang_args=None, mask=None):
+    def forward(self, x, lengths, lang_args=None, mask=None, symbol_id=None):
         # TODO: make it lanugage dependent
+        emb_texts = self.embedding_model(x, symbol_id)
         assert not torch_exist_nan(x)
         for p in self.embedding_model.parameters():
             assert not torch_exist_nan(p.data)

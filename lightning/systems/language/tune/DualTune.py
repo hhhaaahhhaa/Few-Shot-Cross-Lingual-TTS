@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,7 +16,7 @@ from ...plugin.fscl import IFSCLPlugIn, OrigFSCLPlugIn, TransformerFSCLPlugIn
 from ...plugin.tm import ITextMatchingPlugIn, TMPlugIn
 from lightning.utils.tool import flat_merge_dict
 from .utils import generate_reference_info
-from text.define import LANG_ID2NAME
+from text.define import LANG_ID2NAME, LANG_NAME2ID
 
 
 def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMPlugInClass: Type[ITextMatchingPlugIn]):
@@ -263,6 +264,37 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
 
             if is_changed:
                 checkpoint.pop("optimizer_states", None)
+
+        def inference(self, spk_ref_mel_slice: np.ndarray, text: np.ndarray, symbol_id: str, lang_id: str=None):
+            """
+            Return FastSpeech2 results:
+                (
+                    output,
+                    postnet_output,
+                    p_predictions,
+                    e_predictions,
+                    log_d_predictions,
+                    d_rounded,
+                    src_masks,
+                    mel_masks,
+                    src_lens,
+                    mel_lens,
+                )
+            """
+            spk_args = (torch.from_numpy(spk_ref_mel_slice).to(self.device), [slice(0, spk_ref_mel_slice.shape[0])])
+            if lang_id is not None:
+                lang_args = torch.LongTensor([LANG_NAME2ID[lang_id]]).to(self.device)
+            else:
+                lang_args = None
+            texts = torch.from_numpy(text).long().unsqueeze(0).to(self.device)
+            src_lens = torch.LongTensor([len(text)]).to(self.device)
+            max_src_len = max(src_lens)
+            
+            with torch.no_grad():
+                emb_texts = self.tm(texts, lengths=src_lens, symbol_id=symbol_id)
+                output = self.model(spk_args, emb_texts, src_lens, max_src_len, lang_args=lang_args, average_spk_emb=True)
+
+            return output
 
     return DualTuneSystem
 
