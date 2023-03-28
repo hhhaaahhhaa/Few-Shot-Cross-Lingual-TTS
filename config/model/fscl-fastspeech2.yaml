@@ -8,6 +8,7 @@ downstream:
     dropout: 0.2
 
 text_matching:
+  use_matching: True
   codebook:
     codebook_size: 128
     nhead: 4

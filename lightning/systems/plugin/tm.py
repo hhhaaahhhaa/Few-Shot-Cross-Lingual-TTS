@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from dlhlp_lib.utils.tool import get_mask_from_lengths
+from dlhlp_lib.utils.numeric import torch_exist_nan
 
 from lightning.build import build_id2symbols
 from lightning.model import ADAEncoder as TMEncoder
@@ -90,6 +91,7 @@ class TMPlugIn(ITextMatchingPlugIn):
             embed_dim=self.model_config["transformer"]["encoder_hidden"],
             num_heads=self.model_config["codebook"]["nhead"],
         )
+        self.use_matching = self.model_config["use_matching"]
 
     def build_optimized_model(self):
         return self
@@ -104,10 +106,17 @@ class TMPlugIn(ITextMatchingPlugIn):
     
     def forward(self, x, lengths, lang_args=None, mask=None):
         # TODO: make it lanugage dependent
+        assert not torch_exist_nan(x)
+        for p in self.embedding_model.parameters():
+            assert not torch_exist_nan(p.data)
         emb_texts = self.embedding_model(x)
+        assert not torch_exist_nan(emb_texts)
         x = self.encoder(emb_texts, lengths, embed=False, mask=mask)
-        output, _ = self.codebook_attention(x)
-        return output
+        assert not torch_exist_nan(x)
+        if self.use_matching:
+            output, _ = self.codebook_attention(x)
+            return output
+        return x
 
     def loss_func(self, x, y, lengths):
         mask = get_mask_from_lengths(lengths).to(self.device)

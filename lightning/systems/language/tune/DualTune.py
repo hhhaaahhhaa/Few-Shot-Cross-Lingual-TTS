@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from typing import Type
 
 from dlhlp_lib.utils.tool import get_mask_from_lengths
+from dlhlp_lib.utils.numeric import torch_exist_nan
 
 import Define
 from lightning.build import build_all_speakers
@@ -33,6 +34,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             self.tm.codebook_bind(self.fscl.codebook_attention)
             
         def build_model(self):
+            self.threshold = self.algorithm_config["threshold"]
             self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
             self.loss_func = FastSpeech2Loss(self.model_config)
             self.fscl = FSCLPlugInClass(self.model_config)
@@ -110,11 +112,11 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             # c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
             if pl is not None:
                 pseudo_idxs, mask = pl
-                output = self.tm(pseudo_idxs, labels[4], mask=mask)
+                output = self.tm(pseudo_idxs, labels[4])
+                assert not torch_exist_nan(output)
             else:
                 output = self.tm(labels[3], labels[4])
             # print(seg_repr.shape, output.shape)
-            seg_repr = seg_repr.clone().detach()
             m_loss = self.tm.match_loss_func(seg_repr, output, labels[4])
 
             loss_dict = {
@@ -127,12 +129,16 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
         def online_pseudo_label(self):
             seg_repr = self.hooks["seg_repr"]
             centers = self.reference["centers"].to(self.device)  # K, dim
+            assert not torch_exist_nan(seg_repr)
+            assert not torch_exist_nan(centers)
             x = (seg_repr.unsqueeze(2) - centers) ** 2  # B, T, K, dim
             loss = torch.sum(x, dim=-1)  # B, T, K
+            assert not torch_exist_nan(loss)
             
             if "unused_ids" in self.reference:
                 loss[:, :, self.reference["unused_ids"]] = float("inf")
-            loss = F.softmax(-loss, dim=-1)
+            loss = F.softmax(-loss - torch.max(-loss), dim=-1)  # normalize to avoid overflow
+            assert not torch_exist_nan(loss)
             confidences, idxs = loss.max(dim=-1)
 
             return idxs, confidences
@@ -142,16 +148,20 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             with torch.no_grad():
                 seg_repr, attn_fscl = self.fscl.build_segmental_representation([ref_info])
                 seg_repr = seg_repr.detach()
+                assert not torch_exist_nan(seg_repr)
             
             if not train:
                 tm_loss_dict, tm_output = self.common_tm_step(seg_repr, batch, batch_idx, train)  # be careful that seg_repr collapse
                 u2s_loss_dict, u2s_output = self.common_u2s_step(tm_output, batch, batch_idx, train)
             else:
-                threshold = 0.999
                 with torch.no_grad():
                     pseudo_idxs, confidences = self.online_pseudo_label()
-                mask = (confidences < threshold)
+                assert not torch_exist_nan(pseudo_idxs)
+                assert not torch_exist_nan(confidences)
+                mask = (confidences < self.threshold)
+                assert not torch_exist_nan(mask)
                 tm_loss_dict, tm_output = self.common_tm_step(seg_repr, batch, batch_idx, train, pl=(pseudo_idxs, mask))  # be careful that seg_repr collapse
+                # tm_loss_dict, tm_output = self.common_tm_step(seg_repr, batch, batch_idx, train)
                 mixed_repr = torch.where(mask.unsqueeze(-1), seg_repr, tm_output)
                 u2s_loss_dict, u2s_output = self.common_u2s_step(mixed_repr, batch, batch_idx, train)
 
@@ -159,7 +169,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
                 length_mask = get_mask_from_lengths(batch[0][4]).to(self.device)
                 denom = torch.sum(~length_mask)
                 numer = torch.sum((~length_mask) & (~mask))
-                self.log("PL threshold", threshold, sync_dist=True)
+                self.log("PL threshold", self.threshold, sync_dist=True)
                 self.log("PL ratio", numer / max(denom, 1), sync_dist=True)
                 correct = (batch[0][3] == pseudo_idxs)
                 numer2 = torch.sum((~length_mask) & (~mask) & correct)
