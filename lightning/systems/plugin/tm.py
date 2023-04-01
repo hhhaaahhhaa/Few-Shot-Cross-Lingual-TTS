@@ -91,7 +91,7 @@ class TMPlugIn(ITextMatchingPlugIn):
             embed_dim=self.model_config["transformer"]["encoder_hidden"],
             num_heads=self.model_config["codebook"]["nhead"],
         )
-        self.use_matching = self.model_config["use_matching"]
+        self.use_matching = self.model_config.get("use_matching", True)
 
     def build_optimized_model(self):
         return self

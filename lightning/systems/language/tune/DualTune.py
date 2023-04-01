@@ -35,7 +35,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             self.tm.codebook_bind(self.fscl.codebook_attention)
             
         def build_model(self):
-            self.threshold = self.algorithm_config["threshold"]
+            self.threshold = self.algorithm_config.get("threshold", 0.999)
             self.model = FastSpeech2(self.model_config, spk_config=self.spk_config)
             self.loss_func = FastSpeech2Loss(self.model_config)
             self.fscl = FSCLPlugInClass(self.model_config)
@@ -113,7 +113,7 @@ def _dual_tune_fastspeech2_class_factory(FSCLPlugInClass: Type[IFSCLPlugIn], TMP
             # c_loss = self.tm.cluster_loss_func(seg_repr, seg_repr_clustered, labels[4])
             if pl is not None:
                 pseudo_idxs, mask = pl
-                output = self.tm(pseudo_idxs, labels[4])
+                output = self.tm(pseudo_idxs, labels[4], mask)
                 assert not torch_exist_nan(output)
             else:
                 output = self.tm(labels[3], labels[4])

@@ -159,3 +159,18 @@ def reprocess_pr(data, idxs, mode="sup"):
     #     )
     else:
         raise NotImplementedError
+
+
+def reprocess_bd(data, idxs):
+    ids = [data[idx]["id"] for idx in idxs]
+
+    durations = [data[idx]["duration"] for idx in idxs]
+    durations = pad_1D(durations)
+    boundaries = [data[idx]["boundary"] for idx in idxs]
+    boundaries = pad_1D(boundaries)
+
+    return (
+        ids,
+        torch.from_numpy(durations).long(),
+        torch.from_numpy(boundaries).long(),
+    )

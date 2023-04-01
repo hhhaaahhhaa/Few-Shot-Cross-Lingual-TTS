@@ -1,6 +1,7 @@
 from . import language
 from . import phoneme_recognition
 from . import t2u
+from . import boundary_detection
 
 
 DATA_MODULE = {
@@ -56,6 +57,7 @@ DATA_MODULE = {
     "fscl-t2u-c2-da-e2e-tune": t2u.T2U2SDADataModule,
 
     "conti-ae": language.ContiAEDataModule,
+    "bd-ssl-conv": boundary_detection.SSLDataModule,
 }
 
 def get_datamodule(algorithm):
