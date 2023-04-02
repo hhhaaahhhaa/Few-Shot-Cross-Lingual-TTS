@@ -24,4 +24,10 @@ class ADAEncoder(pl.LightningModule):
         final_mask = get_mask_from_lengths(lengths).to(self.device)
         if mask is not None:
             final_mask = torch.logical_or(final_mask, mask)
+            # Avoid to pass full mask into transformer, which will cause NaN gradient.
+            B, L = mask.shape
+            check_full_mask = final_mask.sum(dim=1)
+            for i in range(B):
+                if check_full_mask[i] == L:
+                    final_mask[i][0] = 0
         return self.encoder(x, final_mask)

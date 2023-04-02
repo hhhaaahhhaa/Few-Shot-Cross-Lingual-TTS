@@ -59,11 +59,12 @@ class Classifier(nn.Module):
         if self.mode == "readout":
             layers = []
             for i in range(self.n_in_layers):
-                layers.append(self.layerwise_convolutions[i](x[:, :, i, :].permute(0, 2, 1)))
+                x_slc = x[:, :, i, :].permute(0, 2, 1).contiguous()
+                layers.append(self.layerwise_convolutions[i](x_slc))
             x = torch.stack(layers, dim=0)  # n_in_layer, B, 768, L
             x = self.weighted_sum(x, dim=0)  # B, 768, L
             x = self.network(x)
-            x = x.permute(0, 2, 1)  # B, L, 32
+            x = x.permute(0, 2, 1).contiguous()  # B, L, 32
         elif self.mode == "finetune":
             x = x[:, :, -1, :]  # B, L, upstream_dim
         out = self.out(x).squeeze(-1)  # B, L

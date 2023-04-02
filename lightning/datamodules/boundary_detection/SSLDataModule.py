@@ -8,12 +8,7 @@ from lightning.datasets.boundary_detection import SSLDataset
 from lightning.datamodules.utils import EpisodicInfiniteWrapper
 
 
-class SSLPRDataModule(pl.LightningDataModule):
-    """
-    Train: SSLPRDataset + PRCollate.
-    Val: SSLPRDataset + PRCollate.
-    Test: TextDataset.
-    """
+class SSLDataModule(pl.LightningDataModule):
     def __init__(self, data_configs, model_config, train_config, algorithm_config, log_dir, result_dir):
         super().__init__()
         self.data_configs = data_configs
@@ -62,7 +57,7 @@ class SSLPRDataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size//torch.cuda.device_count(),
             shuffle=True,
-            drop_last=True,
+            drop_last=False,
             num_workers=Define.MAX_WORKERS,
             collate_fn=self.collate.collate_fn(),
         )
@@ -73,7 +68,7 @@ class SSLPRDataModule(pl.LightningDataModule):
         self.val_loader = DataLoader(
             self.val_dataset,
             batch_size=self.batch_size//torch.cuda.device_count(),
-            shuffle=True,
+            shuffle=False,
             drop_last=True,
             num_workers=Define.MAX_WORKERS,
             collate_fn=self.collate.collate_fn(),

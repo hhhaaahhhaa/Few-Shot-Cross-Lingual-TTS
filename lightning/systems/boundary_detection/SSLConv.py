@@ -13,7 +13,7 @@ from dlhlp_lib.utils.tool import get_mask_from_lengths
 import Define
 from lightning.model.boundary_classfier import Classifier
 from lightning.systems.system import System
-from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
+from lightning.callbacks.boundary_detection.saver import Saver
 from lightning.utils.tool import ssl_match_length
 
 
@@ -46,8 +46,8 @@ class SSLConvSystem(System):
         return nn.ModuleList([self.downstream])
 
     def build_saver(self):
-        saver = Saver(self.data_configs, self.log_dir, self.result_dir)
-        return saver
+        self.saver = Saver(self.data_configs, self.model_config, self.log_dir, self.result_dir)
+        return self.saver
 
     def common_step(self, batch, batch_idx, train=True):
         labels, repr_info = batch  # make labels in collate
@@ -59,7 +59,7 @@ class SSLConvSystem(System):
         output = self.downstream(ssl_repr)
         mask = ~get_mask_from_lengths(repr_info["lens"])
 
-        loss = self.loss_func(labels[2], output)
+        loss = self.loss_func(output, labels[2])
         loss = (loss * (mask)).sum() / (mask).sum()
         loss_dict = {
             "Total Loss": loss,
@@ -73,11 +73,16 @@ class SSLConvSystem(System):
 
         # Calculate recall/precision
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        tp = ((labels[2] == (predictions >= 0)) * mask).sum() / mask.sum()
+        correct = ((labels[2] == (predictions >= 0)) * mask).sum()
+        acc = correct / mask.sum()
+        tp = torch.logical_and(labels[2] == 1, predictions >= 0).sum()
         recall = tp / (labels[2] == 1).sum()
-        precision = tp / (predictions >= 0).sum()
+        precision = tp / max(1, ((predictions >= 0) * mask).sum())
+        bd = ((predictions >= 0) * mask).sum() / mask.sum()
+        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True, batch_size=self.bs)
         self.log_dict({"Train/recall": recall.item()}, sync_dist=True, batch_size=self.bs)
         self.log_dict({"Train/precision": precision.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_dict({"Train/bd ratio": bd.item()}, sync_dist=True, batch_size=self.bs)
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
@@ -90,11 +95,18 @@ class SSLConvSystem(System):
 
         # Calculate recall/precision
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        tp = ((labels[2] == (predictions >= 0)) * mask).sum() / mask.sum()
+        correct = ((labels[2] == (predictions >= 0)) * mask).sum()
+        acc = correct / mask.sum()
+        tp = torch.logical_and(labels[2] == 1, predictions >= 0).sum()
         recall = tp / (labels[2] == 1).sum()
-        precision = tp / (predictions >= 0).sum()
+        precision = tp / ((predictions >= 0) * mask).sum()
+        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True, batch_size=self.bs)
         self.log_dict({"Val/recall": recall.item()}, sync_dist=True, batch_size=self.bs)
         self.log_dict({"Val/precision": precision.item()}, sync_dist=True, batch_size=self.bs)
+
+        if batch_idx == 0:
+            layer_weights = F.softmax(self.downstream.weighted_sum.weight_raw, dim=0)
+            self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}

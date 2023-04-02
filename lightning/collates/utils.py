@@ -172,5 +172,5 @@ def reprocess_bd(data, idxs):
     return (
         ids,
         torch.from_numpy(durations).long(),
-        torch.from_numpy(boundaries).long(),
+        torch.from_numpy(boundaries).float(),
     )

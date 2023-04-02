@@ -49,10 +49,6 @@ class SSLDataset(Dataset):
             "symbol_id": self.symbol_id,
         }
 
-        if self.spk_refer_wav:
-            spk_ref_mel_slices = self.data_parser.spk_ref_mel_slices.read_from_query(query)
-            sample.update({"spk_ref_mel_slices": spk_ref_mel_slices})
-
         # For codebook module
         segment = self.unit_parser.segment.read_from_query(query)
         if Define.UPSTREAM == "mel":

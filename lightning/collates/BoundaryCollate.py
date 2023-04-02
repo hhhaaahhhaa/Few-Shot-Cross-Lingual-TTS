@@ -26,10 +26,10 @@ class BoundaryCollate(object):
 
         repr_info = {}
         lang_id = data[0]["lang_id"]
-        repr_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in idx_arr]
-        repr_info["avg_frames"] = [data[idx]["avg-frames"] for idx in idx_arr]
-        repr_info["lens"] = torch.LongTensor([sum(data[idx]["avg-frames"]) for idx in idx_arr])
+        repr_info["raw_feat"] = [torch.from_numpy(data[idx]["raw_feat"]).float() for idx in idx_arr]
+        repr_info["avg_frames"] = [data[idx]["avg_frames"] for idx in idx_arr]
+        repr_info["lens"] = torch.LongTensor([sum(data[idx]["avg_frames"]) for idx in idx_arr])
         repr_info["max_len"] = max(repr_info["lens"])
-        repr_info["lang_id"] = LANG_ID2NAME[lang_id]
+        repr_info["lang_id"] = lang_id
 
         return (labels, repr_info)
