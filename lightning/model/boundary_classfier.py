@@ -71,5 +71,6 @@ class Classifier(nn.Module):
 
         return out
 
-    def get_tune_params(self) -> list:
-        return self.network.children()[-3:] + [self.out]    
+    def get_tune_params(self) -> nn.ModuleList:
+        modules = list(self.network.children())[-3:] + [self.out]
+        return nn.ModuleList(modules)  

@@ -16,7 +16,7 @@ class SSLDataset(Dataset):
         self.config = config
 
         self.name = config["name"]
-        self.unit_name = config["unit_name"]
+        self.unit_name = config.get("unit_name", "gt")
         self.lang_id = config["lang_id"]
         self.symbol_id = config["symbol_id"]
         # self.cleaners = config["text_cleaners"]
