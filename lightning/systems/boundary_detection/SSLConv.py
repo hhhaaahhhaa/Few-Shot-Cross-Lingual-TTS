@@ -124,3 +124,10 @@ class SSLConvSystem(System):
         checkpoint["state_dict"] = new_state_dict
 
         return checkpoint
+    
+    def inference(self, wav):
+        self.upstream.eval()
+        with torch.no_grad():
+            ssl_repr, _ = self.upstream.extract([wav])  # B, L, n_layers, dim
+            output = self.downstream(ssl_repr)
+        return output.squeeze(0) >= 0

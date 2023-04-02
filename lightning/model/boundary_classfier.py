@@ -70,3 +70,6 @@ class Classifier(nn.Module):
         out = self.out(x).squeeze(-1)  # B, L
 
         return out
+
+    def get_tune_params(self) -> list:
+        return self.network.children()[-3:] + [self.out]    

@@ -73,6 +73,7 @@ SYSTEM_T2U = {
 
 SYSTEM_BD = {
     "bd-ssl-conv": boundary_detection.SSLConvSystem,
+    "bd-ssl-conv-tune": boundary_detection.SSLConvTuneSystem,
 }
 
 
