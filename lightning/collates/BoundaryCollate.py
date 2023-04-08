@@ -4,7 +4,7 @@ from functools import partial
 from collections import defaultdict
 
 from text.define import LANG_ID2SYMBOLS
-from .utils import reprocess_bd
+from .utils import reprocess_bd, reprocess_bd2
 
 
 class BoundaryCollate(object):
@@ -18,7 +18,7 @@ class BoundaryCollate(object):
         data_size = len(data)
 
         if sort:
-            len_arr = np.array([d["duration"].shape[0] for d in data])
+            len_arr = np.array([d["mel"].shape[0] for d in data])
             idx_arr = np.argsort(-len_arr)
         else:
             idx_arr = np.arange(data_size)
@@ -33,3 +33,23 @@ class BoundaryCollate(object):
         repr_info["lang_id"] = lang_id
 
         return (labels, repr_info)
+
+
+class BoundaryCollate2(object):
+    def __init__(self, data_configs):
+        pass
+
+    def collate_fn(self, sort=False):
+        return partial(self._collate_fn, sort=sort)
+
+    def _collate_fn(self, data, sort=False):
+        data_size = len(data)
+
+        if sort:
+            len_arr = np.array([d["mel"].shape[0] for d in data])
+            idx_arr = np.argsort(-len_arr)
+        else:
+            idx_arr = np.arange(data_size)
+        labels = reprocess_bd2(data, idx_arr)
+
+        return labels

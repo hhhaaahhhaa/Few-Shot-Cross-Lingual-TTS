@@ -1,1 +1,15 @@
 pos_weight: 1.0
+rnn_input_size: 80
+rnn_hidden_size: 256
+rnn_dropout: 0.3
+birnn: True
+rnn_layers: 2
+min_seg_size: 1
+max_seg_size: 100
+max_len: 1500
+
+n_classes: 40
+bin_cls: 0.0
+phn_cls: 0.0
+delta_feats: False
+dist_feats: False

@@ -59,6 +59,8 @@ DATA_MODULE = {
     "conti-ae": language.ContiAEDataModule,
     "bd-ssl-conv": boundary_detection.SSLDataModule,
     "bd-ssl-conv-tune": boundary_detection.SSLDataModule,
+    "bd-segfeat": boundary_detection.MelDataModule,
+    "bd-segfeat-tune": boundary_detection.MelDataModule,
 }
 
 def get_datamodule(algorithm):

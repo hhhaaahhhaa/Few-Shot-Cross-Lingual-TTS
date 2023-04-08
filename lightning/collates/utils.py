@@ -174,3 +174,50 @@ def reprocess_bd(data, idxs):
         torch.from_numpy(durations).long(),
         torch.from_numpy(boundaries).float(),
     )
+
+
+def reprocess_bd2(data, idxs):
+    ids = [data[idx]["id"] for idx in idxs]
+
+    mels = [data[idx]["mel"] for idx in idxs]
+    durations = [data[idx]["duration"] for idx in idxs]
+    boundaries = durations2boundaries(durations)
+    mel_lens = np.array([mel.shape[0] for mel in mels])
+    texts = [data[idx]["text"] for idx in idxs]
+    text_lens = np.array([text.shape[0] for text in texts])
+    texts = pad_1D(texts)
+
+    mels = pad_2D(mels)
+
+    segs = []
+    for duration in durations:
+        seg = np.cumsum(np.array([0] + duration))
+        segs.append(seg)
+
+    return (
+        ids,
+        torch.from_numpy(texts).long(),
+        torch.from_numpy(text_lens),
+        max(text_lens),
+        torch.from_numpy(mels).float(),
+        torch.from_numpy(mel_lens),
+        max(mel_lens),
+        segs,
+        boundaries,
+    )
+
+
+def durations2boundaries(durations) -> torch.FloatTensor:
+    boundaries = []
+    for duration in durations:
+        if isinstance(duration, torch.tensor):
+            duration = duration.tolist()
+        pos = 0
+        boundary = np.zeros(sum(duration)) 
+        for d in duration:
+            pos += d
+            if pos > 0:
+                boundary[pos - 1] = 1
+        boundaries.append(boundary)
+    boundaries = pad_1D(boundaries)
+    return torch.from_numpy(boundaries).float(),

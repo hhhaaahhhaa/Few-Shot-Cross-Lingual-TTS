@@ -110,8 +110,6 @@ class TMPlugIn(ITextMatchingPlugIn):
         assert not torch_exist_nan(x)
         for p in self.embedding_model.parameters():
             assert not torch_exist_nan(p.data)
-        emb_texts = self.embedding_model(x)
-        assert not torch_exist_nan(emb_texts)
         x = self.encoder(emb_texts, lengths, embed=False, mask=mask)
         assert not torch_exist_nan(x)
         if self.use_matching:

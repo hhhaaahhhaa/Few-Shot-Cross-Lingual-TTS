@@ -15,6 +15,7 @@ from lightning.model.boundary_classfier import Classifier
 from lightning.systems.system import System
 from lightning.callbacks.boundary_detection.saver import Saver
 from lightning.utils.tool import ssl_match_length
+from lightning.collates.utils import durations2boundaries
 
 
 class SSLConvSystem(System):
@@ -59,7 +60,9 @@ class SSLConvSystem(System):
         output = self.downstream(ssl_repr)
         mask = ~get_mask_from_lengths(repr_info["lens"])
 
-        loss = self.loss_func(output, labels[2])
+        gt_boundaries = durations2boundaries(repr_info["avg_frames"]).to(self.device)
+
+        loss = self.loss_func(output, gt_boundaries)
         loss = (loss * (mask)).sum() / (mask).sum()
         loss_dict = {
             "Total Loss": loss,
@@ -72,17 +75,10 @@ class SSLConvSystem(System):
         train_loss_dict, predictions = self.common_step(batch, batch_idx, train=True)
 
         # Calculate recall/precision
+        pred_boundaries = predictions
+        gt_boundaries = durations2boundaries(repr_info["avg_frames"]).to(self.device)
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        correct = ((labels[2] == (predictions >= 0)) * mask).sum()
-        acc = correct / mask.sum()
-        tp = torch.logical_and(labels[2] == 1, predictions >= 0).sum()
-        recall = tp / (labels[2] == 1).sum()
-        precision = tp / max(1, ((predictions >= 0) * mask).sum())
-        bd = ((predictions >= 0) * mask).sum() / mask.sum()
-        self.log_dict({"Train/Acc": acc.item()}, sync_dist=True, batch_size=self.bs)
-        self.log_dict({"Train/recall": recall.item()}, sync_dist=True, batch_size=self.bs)
-        self.log_dict({"Train/precision": precision.item()}, sync_dist=True, batch_size=self.bs)
-        self.log_dict({"Train/bd ratio": bd.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_boundary_detection_metric(self, gt_boundaries, pred_boundaries, mask, stage="Train")
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
@@ -94,15 +90,10 @@ class SSLConvSystem(System):
         val_loss_dict, predictions = self.common_step(batch, batch_idx, train=True)
 
         # Calculate recall/precision
+        pred_boundaries = predictions
+        gt_boundaries = durations2boundaries(repr_info["avg_frames"]).to(self.device)
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        correct = ((labels[2] == (predictions >= 0)) * mask).sum()
-        acc = correct / mask.sum()
-        tp = torch.logical_and(labels[2] == 1, predictions >= 0).sum()
-        recall = tp / (labels[2] == 1).sum()
-        precision = tp / ((predictions >= 0) * mask).sum()
-        self.log_dict({"Val/Acc": acc.item()}, sync_dist=True, batch_size=self.bs)
-        self.log_dict({"Val/recall": recall.item()}, sync_dist=True, batch_size=self.bs)
-        self.log_dict({"Val/precision": precision.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_boundary_detection_metric(self, gt_boundaries, pred_boundaries, mask, stage="Val")
 
         if batch_idx == 0:
             layer_weights = F.softmax(self.downstream.weighted_sum.weight_raw, dim=0)
@@ -112,6 +103,18 @@ class SSLConvSystem(System):
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': labels}
+
+    def log_boundary_detection_metric(self, gt_boundaries, pred_boundaries, mask, stage="Train"):
+        correct = ((gt_boundaries == (pred_boundaries >= 0)) * mask).sum()
+        acc = correct / mask.sum()
+        tp = torch.logical_and(gt_boundaries == 1, pred_boundaries >= 0).sum()
+        recall = tp / (gt_boundaries == 1).sum()
+        precision = tp / max(1, ((pred_boundaries >= 0) * mask).sum())
+        bd = ((pred_boundaries >= 0) * mask).sum() / mask.sum()
+        self.log_dict({f"{stage}/Acc": acc.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_dict({f"{stage}/recall": recall.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_dict({f"{stage}/precision": precision.item()}, sync_dist=True, batch_size=self.bs)
+        self.log_dict({f"{stage}/bd ratio": bd.item()}, sync_dist=True, batch_size=self.bs)
 
     def on_save_checkpoint(self, checkpoint):
         """ (Hacking!) Remove pretrained weights in checkpoint to save disk space. """
