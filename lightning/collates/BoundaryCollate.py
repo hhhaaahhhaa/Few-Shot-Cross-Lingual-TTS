@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from functools import partial
 from collections import defaultdict
+import time
 
 from text.define import LANG_ID2SYMBOLS
 from .utils import reprocess_bd, reprocess_bd2
@@ -43,6 +44,7 @@ class BoundaryCollate2(object):
         return partial(self._collate_fn, sort=sort)
 
     def _collate_fn(self, data, sort=False):
+        # st = time.time()
         data_size = len(data)
 
         if sort:
@@ -51,5 +53,6 @@ class BoundaryCollate2(object):
         else:
             idx_arr = np.arange(data_size)
         labels = reprocess_bd2(data, idx_arr)
+        # print("collate time: ", time.time() - st)
 
         return labels

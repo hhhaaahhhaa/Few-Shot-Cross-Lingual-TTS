@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 
 import Define
 from lightning.collates import BoundaryCollate2
-from lightning.datasets.boundary_detection import SSLDataset
+from lightning.datasets.boundary_detection import MelDataset
 from lightning.datamodules.utils import EpisodicInfiniteWrapper
 
 
@@ -25,14 +25,14 @@ class MelDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         if stage in (None, 'fit', 'validate'):
             self.train_datasets = [
-                SSLDataset(
+                MelDataset(
                     data_config['subsets']['train'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config
                 ) for data_config in self.data_configs if 'train' in data_config['subsets']
             ]
             self.val_datasets = [
-                SSLDataset(
+                MelDataset(
                     data_config['subsets']['val'],
                     Define.DATAPARSERS[data_config["name"]],
                     data_config

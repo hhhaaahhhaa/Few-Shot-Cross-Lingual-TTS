@@ -6,9 +6,13 @@ birnn: True
 rnn_layers: 2
 min_seg_size: 1
 max_seg_size: 100
+max_dpdp_size: 200
 max_len: 1500
+cuda: True
 
 n_classes: 40
+use_bin: False
+use_cls: False
 bin_cls: 0.0
 phn_cls: 0.0
 delta_feats: False

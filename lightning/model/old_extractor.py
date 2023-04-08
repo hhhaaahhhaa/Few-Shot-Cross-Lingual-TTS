@@ -64,7 +64,6 @@ class S3PRLExtractor(pl.LightningModule):
         print("Check s3prl")
         for r in representation_list:
             print(r[24].sum())
-        input()
 
         # SSL representation phoneme-level average
         # lang_id = info["lang_id"]

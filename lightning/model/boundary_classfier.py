@@ -87,6 +87,8 @@ class Segmentor(nn.Module):
         self.device = 'cuda' if hparams.cuda else 'cpu'
         self.min_seg_size = hparams.min_seg_size
         self.max_seg_size = hparams.max_seg_size
+        self.max_dpdp_size = hparams.max_dpdp_size
+        assert hparams.max_dpdp_size >= hparams.max_seg_size
         self.use_bin = hparams.use_bin
         self.use_cls = hparams.use_cls
 
@@ -121,26 +123,7 @@ class Segmentor(nn.Module):
                     nn.Linear(hparams.n_classes * 2, 2),
                     )
 
-    def calc_phi(self, rnn_out):
-        batch_size, seq_len, feat_dim = rnn_out.shape
-        rnn_out = torch.cat((torch.zeros((batch_size, 1, feat_dim)).to(rnn_out.device), rnn_out), dim=1)
-        rnn_cum = torch.cumsum(rnn_out, dim=1)
-
-        a = rnn_cum.repeat(1, seq_len, 1)
-        b = rnn_cum.repeat(1, 1, seq_len).view(batch_size, -1, feat_dim)
-        c = a.sub_(b).view(batch_size, seq_len, seq_len, feat_dim)
-
-        d = rnn_out.repeat(1, 1, seq_len).view(batch_size, seq_len, seq_len, feat_dim)
-        e = rnn_out.repeat(1, seq_len, 1).view(batch_size, seq_len, seq_len, feat_dim)
-        phi = torch.cat([c, d, e], dim=-1)  # B, L + 1, L + 1, 3 * dim
-
-        return phi
-
-    def calc_all_scores(self, phi):
-        scores = self.scorer(phi).squeeze(-1)  # B, L + 1, L + 1
-        return scores
-
-    def get_segmentation_score(self, scores, segmentations):
+    def get_segmentation_score(self, rnn_out, rnn_cum, segmentations):
         """get_segmentation_score
         calculate the overall score for a whole segmentation for a batch of
         segmentations
@@ -149,17 +132,53 @@ class Segmentor(nn.Module):
         :param segmentations:
         returns: tensor of shape Bx1 where scores[i] = score for segmentation i
         """
-        out_scores = torch.zeros((scores.shape[0])).to(scores.device)
+        out_scores = torch.zeros((len(segmentations))).to(self.device)
         for seg_idx, seg in enumerate(segmentations):
-            score = 0
-            seg = zip(seg[:-1], seg[1:])
-            for start, end in seg:
-                score += scores[seg_idx, start, end]
+            cs, ds, es = [], [], []
+            for start, end in zip(seg[:-1], seg[1:]):
+                cs.append(rnn_cum[seg_idx, end] - rnn_cum[seg_idx, start])
+                ds.append(rnn_out[seg_idx, start])
+                es.append(rnn_out[seg_idx, end])
+            cs = torch.stack(cs, dim=0)  # n_seg, dim
+            ds = torch.stack(ds, dim=0)  # n_seg, dim
+            es = torch.stack(es, dim=0)  # n_seg, dim
+            phi = torch.cat([cs, ds, es], dim=-1)  # n_seg, 3 * dim
+            score = self.scorer(phi).squeeze(-1)
+            # if seg_idx == 0:
+            #     print(seg)
+            #     print(score)
+            score = score.sum()
             out_scores[seg_idx] = score
 
         return out_scores
 
-    def segment_search(self, scores, lengths):
+    def calc_score(self, rnn_out, rnn_cum, st, ed):
+        ed = min(ed, rnn_cum.shape[1])
+        c = -rnn_cum[:, st:ed].unsqueeze(2) + rnn_cum[:, st:ed].unsqueeze(1)  # B, ed-st, ed-st, dim
+        d = rnn_out[:, st:ed].unsqueeze(2).expand(-1, -1, ed-st, -1)
+        e = rnn_out[:, st:ed].unsqueeze(1).expand(-1, ed-st, -1, -1)
+        phi = torch.cat([c, d, e], dim=-1)  # B, ed-st, ed-st, 3 * dim
+        scores = self.scorer(phi).squeeze(-1)  # B, ed-st, ed-st
+
+        return scores
+    
+    # Matching to check vectorize implementation's correctness.
+    # def calc_score_match(self, rnn_out, rnn_cum, st, ed):
+    #     ed = min(ed, rnn_cum.shape[1])
+    #     B = rnn_out.shape[0]
+    #     scores = torch.zeros(B, ed-st, ed-st).to(self.device)
+    #     for b in range(B):
+    #         for i in range(ed-st):
+    #             for j in range(ed-st):
+    #                 c = rnn_cum[b, j] - rnn_cum[b, i]
+    #                 d = rnn_out[b, i]
+    #                 e = rnn_out[b, j]
+    #                 phi = torch.cat([c, d, e], dim=-1)  # 3 * dim
+    #                 score = self.scorer(phi)
+    #                 scores[b][i][j] = score
+    #     return scores
+
+    def segment_search(self, rnn_out, rnn_cum, lengths):
         '''
         Apply dynamic programming algorithm for finding the best segmentation when
         k (the number of segments) is unknown.
@@ -174,18 +193,32 @@ class Segmentor(nn.Module):
         Notes:
             The algorithm complexity is O(n**2)
         '''
-        batch_size, max_length = scores.shape[:2]
-        scores, lengths = scores.to('cpu'), lengths.to('cpu')
+        batch_size, max_length = rnn_out.shape[:2]
+        lengths = lengths.to('cpu')
 
         # Dynamic programming algorithm for inference (with batching)
-        best_scores = torch.zeros(batch_size, max_length + 1)
-        prev = torch.zeros(batch_size, max_length + 1)
+        best_scores = torch.zeros(batch_size, max_length).to(self.device)
+        prev = torch.zeros(batch_size, max_length).to(self.device)
         # segmentations = [[[0]] for _ in range(batch_size)]
 
-        for i in range(1, max_length + 1):
+        score_start_idx = 0
+        score_end_idx = self.max_dpdp_size
+        scores = self.calc_score(rnn_out, rnn_cum, score_start_idx, score_end_idx)
+        # scores2 = self.calc_score_match(rnn_out, rnn_cum, score_start_idx, score_end_idx)
+        for i in range(1, max_length):
             # Get scores of subsequences of seq[:i] that ends with i
             start_index = max(0, i - self.max_seg_size)
-            current_scores = best_scores[:, start_index:i] + scores[:, start_index:i, i]
+
+            # Calculte score online.
+            # Calculate once for fix iterations to achieve good tradeoff between GPU usage and runtime!
+            if i == score_end_idx:
+                score_start_idx += self.max_dpdp_size // 2
+                score_end_idx += self.max_dpdp_size // 2
+                scores = self.calc_score(rnn_out, rnn_cum, score_start_idx, score_end_idx)
+
+            assert start_index >= score_start_idx
+            assert i - score_start_idx < self.max_dpdp_size
+            current_scores = best_scores[:, start_index:i] + scores[:, start_index-score_start_idx:i-score_start_idx, i-score_start_idx]
 
             # Choose the best scores and their corresponding indexes
             max_scores, k = torch.max(current_scores, 1)
@@ -194,25 +227,26 @@ class Segmentor(nn.Module):
             # Add current best score and best segmentation
             best_scores[:, i] = max_scores
             prev[:, i] = k
-            # for batch_index in range(batch_size):
-            #     currrent_segmentation = segmentations[batch_index][k[batch_index]] + [i]
-            #     segmentations[batch_index].append(currrent_segmentation)
 
-        # Get real segmentations according to the real lengths of the sequences
-        # in the batch
+        # Get real segmentations according to the real lengths of the sequences in the batch
         pred_seg = []
         for i in range(batch_size):
             segs = []
             cur = lengths[i].item()
             while cur > 0:
                 segs.append(cur)
-                cur = prev[i][cur].item()
+                cur = int(prev[i][cur].item())
             segs.append(0)
             segs.reverse()
             pred_seg.append(segs)
-        # for i, seg in enumerate(segmentations):
-        #     last_index = lengths[i].item() - 1
-        #     pred_seg.append(seg[last_index])
+            # if i == 0:
+            #     print("predict")
+            #     print(segs)
+            #     for s in segs:
+            #         if s == 0:
+            #             continue
+            #         s1 = int(prev[i][s].item())
+            #         print(best_scores[i, s] - best_scores[i, s1])
 
         return pred_seg
 
@@ -224,12 +258,9 @@ class Segmentor(nn.Module):
         results = {}
 
         # feed through rnn
-        x = nn.utils.rnn.pack_padded_sequence(x, length, batch_first=True, enforce_sorted=False)
+        x = nn.utils.rnn.pack_padded_sequence(x, length.cpu(), batch_first=True, enforce_sorted=False)
         rnn_out, _ = self.rnn(x)
         rnn_out, _ = nn.utils.rnn.pad_packed_sequence(rnn_out, batch_first=True)
-
-        # calc_phi will append zero frame at the begining so that the shape of score becomes len + 1.
-        phi = self.calc_phi(rnn_out)  # B, L + 1, L + 1
 
         # feed through classifiers
         if self.use_cls:
@@ -238,11 +269,19 @@ class Segmentor(nn.Module):
             results['bin_out'] = self.bin_classifier(rnn_out)
 
         # feed through search
-        scores = self.calc_all_scores(phi)
-        results['pred'] = self.segment_search(scores, length)
-        results['pred_scores'] = self.get_segmentation_score(scores, results['pred'])
+        # score need to be calculated online since GPU usage is way too large
+        # scores = self.calc_all_scores(phi)
+
+        # calc_phi will append zero frame at the begining so that the shape of score becomes len + 1.
+        batch_size, _, feat_dim = rnn_out.shape
+        rnn_out = torch.cat((torch.zeros((batch_size, 1, feat_dim)).to(rnn_out.device), rnn_out), dim=1)
+        rnn_cum = torch.cumsum(rnn_out, dim=1)
+
+        with torch.no_grad():
+            results['pred'] = self.segment_search(rnn_out, rnn_cum, length)
+        results['pred_scores'] = self.get_segmentation_score(rnn_out, rnn_cum, results['pred'])
 
         if gt_seg is not None:
-            results['gt_scores'] = self.get_segmentation_score(scores, gt_seg)
+            results['gt_scores'] = self.get_segmentation_score(rnn_out, rnn_cum, gt_seg)
 
         return results

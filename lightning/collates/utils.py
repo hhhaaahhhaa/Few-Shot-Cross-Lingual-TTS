@@ -191,7 +191,12 @@ def reprocess_bd2(data, idxs):
 
     segs = []
     for duration in durations:
-        seg = np.cumsum(np.array([0] + duration))
+        seg = [0]
+        pos = 0
+        for d in duration:
+            pos += d
+            if d > 0:
+                seg.append(pos)
         segs.append(seg)
 
     return (
@@ -210,14 +215,14 @@ def reprocess_bd2(data, idxs):
 def durations2boundaries(durations) -> torch.FloatTensor:
     boundaries = []
     for duration in durations:
-        if isinstance(duration, torch.tensor):
+        if isinstance(duration, torch.Tensor):
             duration = duration.tolist()
         pos = 0
         boundary = np.zeros(sum(duration)) 
         for d in duration:
             pos += d
-            if pos > 0:
+            if d > 0:
                 boundary[pos - 1] = 1
         boundaries.append(boundary)
     boundaries = pad_1D(boundaries)
-    return torch.from_numpy(boundaries).float(),
+    return torch.from_numpy(boundaries).float()

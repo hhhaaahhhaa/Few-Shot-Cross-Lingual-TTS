@@ -78,7 +78,7 @@ class SSLConvSystem(System):
         pred_boundaries = predictions
         gt_boundaries = durations2boundaries(repr_info["avg_frames"]).to(self.device)
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        self.log_boundary_detection_metric(self, gt_boundaries, pred_boundaries, mask, stage="Train")
+        self.log_boundary_detection_metric(gt_boundaries, pred_boundaries, mask, stage="Train")
 
         # Log metrics to CometLogger
         loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
@@ -93,7 +93,7 @@ class SSLConvSystem(System):
         pred_boundaries = predictions
         gt_boundaries = durations2boundaries(repr_info["avg_frames"]).to(self.device)
         mask = ~get_mask_from_lengths(repr_info["lens"])
-        self.log_boundary_detection_metric(self, gt_boundaries, pred_boundaries, mask, stage="Val")
+        self.log_boundary_detection_metric(gt_boundaries, pred_boundaries, mask, stage="Val")
 
         if batch_idx == 0:
             layer_weights = F.softmax(self.downstream.weighted_sum.weight_raw, dim=0)
