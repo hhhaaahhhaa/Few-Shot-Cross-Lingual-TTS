@@ -39,15 +39,15 @@ SYSTEM_DUAL = {
 
 
 SYSTEM_PR = {
-    "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
-    "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
-    "pr-ssl-cluster": phoneme_recognition.SSLClusterSystem,
+    "pr-ssl-linear": phoneme_recognition.SSLLinearSystem,
+    # "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
+    # "pr-ssl-cluster": phoneme_recognition.SSLClusterSystem,
     # "pr-ssl-codebook-cluster": phoneme_recognition.SSLCodebookClusterSystem,
-    "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem,
-    "pr-ssl-cluster-tune": phoneme_recognition.SSLClusterTuneSystem,
+    # "pr-ssl-baseline-tune": phoneme_recognition.SSLBaselineTuneSystem,
+    # "pr-ssl-cluster-tune": phoneme_recognition.SSLClusterTuneSystem,
     # "pr-fscl": phoneme_recognition.TransHeadSystem,
     # "pr-fscl-tune": phoneme_recognition.TransHeadTuneSystem,
-    "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
+    # "pr-ssl-protonet": phoneme_recognition.SSLProtoNetSystem,
 }
 
 
@@ -82,7 +82,7 @@ SYSTEM_BD = {
 SYSTEM = {
     **SYSTEM_SYNTHESIS,
     **SYSTEM_DUAL,
-    # **SYSTEM_PR,
+    **SYSTEM_PR,
     **SYSTEM_T2U,
     **SYSTEM_BD
 }
@@ -107,7 +107,7 @@ def get_system(algorithm) -> Type[System]:
 #     "fscl-tune": language.TransEmbTuneSystem,
 #     "fscl-orig-tune": language.TransEmbOrigTuneSystem,
 
-#     "pr-ssl-linear-tune": phoneme_recognition.SSLLinearSystem,
+#     "pr-ssl-linear": phoneme_recognition.SSLLinearSystem,
 #     "pr-ssl-baseline": phoneme_recognition.SSLBaselineSystem,
 #     "pr-ssl-cluster": phoneme_recognition.SSLClusterSystem,
 #     # "pr-ssl-codebook-cluster": phoneme_recognition.SSLCodebookClusterSystem,

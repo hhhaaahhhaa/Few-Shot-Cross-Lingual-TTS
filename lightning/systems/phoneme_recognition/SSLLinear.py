@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from dlhlp_lib.s3prl import S3PRLExtractor
+from dlhlp_lib.common.layers import WeightedSumLayer
 
 import Define
 from lightning.build import build_id2symbols
@@ -11,8 +12,7 @@ from lightning.systems.system import System
 from lightning.callbacks.phoneme_recognition.baseline_saver import Saver
 from lightning.utils.tool import ssl_match_length
 from .loss import PRFramewiseLoss
-from .downstreams import *
-from .heads import *
+from .heads import MultilingualPRHead
 from .SSLBaseline import training_step_template, validation_step_template
 
 
@@ -26,7 +26,7 @@ class SSLLinearSystem(System):
         super().__init__(*args, **kwargs)
 
     def build_model(self):
-        self.upstream = S3PRLExtractor("hubert_large_ll60k")
+        self.upstream = S3PRLExtractor(Define.UPSTREAM)
         self.upstream.freeze()
         self.downstream = WeightedSumLayer(
             n_in_layers=Define.UPSTREAM_LAYER, specific_layer=Define.LAYER_IDX)
