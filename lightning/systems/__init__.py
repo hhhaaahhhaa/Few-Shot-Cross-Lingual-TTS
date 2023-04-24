@@ -6,6 +6,7 @@ from . import language
 from . import phoneme_recognition
 from . import t2u
 from . import boundary_detection
+from . import semi
 
 
 SYSTEM_SYNTHESIS = {
@@ -79,12 +80,19 @@ SYSTEM_BD = {
 }
 
 
+SYSTEM_SEMI = {
+    "semi-baseline": semi.BaselineSystem,
+    "semi": semi.SemiSystem,
+}
+
+
 SYSTEM = {
     **SYSTEM_SYNTHESIS,
     **SYSTEM_DUAL,
     **SYSTEM_PR,
     **SYSTEM_T2U,
-    **SYSTEM_BD
+    **SYSTEM_BD,
+    **SYSTEM_SEMI,
 }
 
 

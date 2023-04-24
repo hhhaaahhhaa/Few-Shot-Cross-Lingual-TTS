@@ -95,10 +95,10 @@ class FastSpeech2(pl.LightningModule):
         # print(output.sum(-1))
         # input()
 
-        if not Define.NOLID:  # Hacking
-            if self.language_emb is not None and lang_args is not None:
-                lang_emb = self.language_emb(lang_args)
-                output += lang_emb.unsqueeze(1).expand(-1, max_src_len, -1)
+        # if not Define.NOLID:
+        #     if self.language_emb is not None and lang_args is not None:
+        #         lang_emb = self.language_emb(lang_args)
+        #         output += lang_emb.unsqueeze(1).expand(-1, max_src_len, -1)
 
         (
             output,

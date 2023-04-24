@@ -1,3 +1,4 @@
+from typing import Type
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,7 +13,7 @@ from ..language.embeddings import MultilingualEmbedding, SoftMultiAttCodebook
 
 
 class ITextMatchingPlugIn(pl.LightningModule):
-    """ Interface for FSCLPlugIn """
+    """ Interface for TMPlugIn """
     def build_model(self, *args, **kwargs):
         raise NotImplementedError
     

@@ -61,6 +61,9 @@ DATA_MODULE = {
     "bd-ssl-conv-tune": boundary_detection.SSLDataModule,
     "bd-segfeat": boundary_detection.MelDataModule,
     "bd-segfeat-tune": boundary_detection.MelDataModule,
+
+    "semi-baseline": language.FastSpeech2DataModule,
+    "semi": language.UnitDataModule,
 }
 
 def get_datamodule(algorithm):
