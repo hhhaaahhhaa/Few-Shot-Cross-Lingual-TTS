@@ -27,7 +27,6 @@ class SemiFSCLPlugIn(FSCLPlugIn, Hookable):
         self._custom_hooks = {}
 
     def _build_model(self):
-        self.use_matching = self.model_config.get("use_matching", True)
         if self.upstream == "mel":
             self.upstream = Padding()
             self.featurizer = None
@@ -54,7 +53,7 @@ class SemiFSCLPlugIn(FSCLPlugIn, Hookable):
         self.codebook_attention = SoftMultiAttCodebook(
             codebook_size=self.model_config["codebook_size"],
             embed_dim=self.model_config["transformer"]["encoder_hidden"],
-            num_heads=self.model_config["downstream"]["transformer"]["nhead"],
+            num_heads=self.model_config["nhead"],
         )
         self.checkpoint_remove_list = ["upstream"]
     

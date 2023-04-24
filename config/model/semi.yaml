@@ -1,0 +1,66 @@
+fscl:
+  codebook_size: 128
+  nhead: 4
+  downstream:
+    transformer:
+      d_model: 256
+      nhead: 4
+      layer: 2
+      dim_feedforward: [256, 256]
+      dropout: 0.2
+
+use_matching: True
+matching:
+  codebook_size: 128
+  dim: 256
+  nhead: 4
+
+text_encoder:
+  transformer:
+    encoder_layer: 2
+    encoder_head: 2
+    encoder_hidden: 256
+    conv_filter_size: 1024
+    conv_kernel_size: [9, 1]
+    encoder_dropout: 0.2
+  max_seq_len: 1500
+  
+transformer:
+  encoder_layer: 4
+  encoder_head: 2
+  encoder_hidden: 256
+  decoder_layer: 6
+  decoder_head: 2
+  decoder_hidden: 256
+  conv_filter_size: 1024
+  conv_kernel_size: [9, 1]
+  encoder_dropout: 0.2
+  decoder_dropout: 0.2
+
+variance_predictor:
+  filter_size: 256
+  kernel_size: 3
+  dropout: 0.5
+
+variance_embedding:
+  pitch_quantization: "linear" # support 'linear' or 'log', 'log' is allowed only if the pitch values are not normalized during preprocessing
+  energy_quantization: "linear" # support 'linear' or 'log', 'log' is allowed only if the energy values are not normalized during preprocessing
+  n_bins: 256
+
+pitch:
+    feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
+    normalization: True
+energy:
+    feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
+    normalization: True
+
+multi_speaker: True
+multi_lingual: True
+
+max_seq_len: 1500
+
+speaker_emb: dvec
+
+vocoder:
+  model: "HifiGAN"
+  speaker: "universal" # support  'LJSpeech', 'universal'
