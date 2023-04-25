@@ -79,6 +79,18 @@ class Classifier(nn.Module):
         return nn.ModuleList(modules)  
 
 
+
+class NormedLinear(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
+        self.net = nn.Linear(*args, **kwargs)
+    
+    def forward(self, x):
+        x = self.net(x)
+        x = x / (torch.linalg.norm(self.net.weight, dim=1) + 1e-6)
+        return x
+
+
 class Segmentor(nn.Module):
     def __init__(self, model_config):
         super(Segmentor, self).__init__()
@@ -104,7 +116,7 @@ class Segmentor(nn.Module):
                 nn.PReLU(),
                 nn.Linear((2 if hparams.birnn else 1) * 3 * hparams.rnn_hidden_size, 100),
                 nn.PReLU(),
-                nn.Linear(100, 1),
+                NormedLinear(100, 1),
                 )
 
         if self.use_cls:
@@ -277,8 +289,7 @@ class Segmentor(nn.Module):
         rnn_out = torch.cat((torch.zeros((batch_size, 1, feat_dim)).to(rnn_out.device), rnn_out), dim=1)
         rnn_cum = torch.cumsum(rnn_out, dim=1)
 
-        with torch.no_grad():
-            results['pred'] = self.segment_search(rnn_out, rnn_cum, length)
+        results['pred'] = self.segment_search(rnn_out, rnn_cum, length)
         results['pred_scores'] = self.get_segmentation_score(rnn_out, rnn_cum, results['pred'])
 
         if gt_seg is not None:

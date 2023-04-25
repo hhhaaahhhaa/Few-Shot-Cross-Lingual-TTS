@@ -57,7 +57,7 @@ class BaselineSystem(System):
         emb_texts = self.embedding_model(batch[3])
         emb_texts = self.text_encoder(emb_texts, lengths=batch[4])
         if self.use_matching:
-            emb_texts = self.text_matching(emb_texts)
+            emb_texts, _ = self.text_matching(emb_texts)
         output = self.model(batch[2], emb_texts, *(batch[4:]))
         loss = self.loss_func(batch[:-1], output)
         loss_dict = {
@@ -74,7 +74,7 @@ class BaselineSystem(System):
         emb_texts = self.embedding_model(batch[3])
         emb_texts = self.text_encoder(emb_texts, lengths=batch[4])
         if self.use_matching:
-            emb_texts = self.text_matching(emb_texts)
+            emb_texts, _ = self.text_matching(emb_texts)
         output = self.model(batch[2], emb_texts, *(batch[4:6]), lang_args=batch[-1], average_spk_emb=True)
         return output
     
@@ -130,7 +130,7 @@ class BaselineSystem(System):
             emb_texts = self.embedding_model(texts, symbol_id)
             emb_texts = self.text_encoder(emb_texts, lengths=src_lens)
             if self.use_matching:
-                emb_texts = self.text_matching(emb_texts)
+                emb_texts, _ = self.text_matching(emb_texts)
             output = self.model(spk_args, emb_texts, src_lens, max_src_len, lang_args=lang_args, average_spk_emb=True)
 
         return output

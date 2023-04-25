@@ -28,7 +28,7 @@ class SSLPRDataModule(pl.LightningDataModule):
         self.val_step = self.train_config["step"]["val_step"]
 
         self.collate = SSLPRCollate()
-        self.collate2 = TextCollate()
+        # self.collate2 = TextCollate()
 
         self.dataset_cls = dataset_cls
 
@@ -55,16 +55,16 @@ class SSLPRDataModule(pl.LightningDataModule):
             self._train_setup()
             self._validation_setup()
 
-        if stage in (None, 'test', 'predict'):
-            self.test_datasets = [
-                TextDataset(
-                    data_config['subsets']['test'],
-                    Define.DATAPARSERS[data_config["name"]],
-                    data_config
-                ) for data_config in self.data_configs if 'test' in data_config['subsets']
-            ]
-            self.test_dataset = ConcatDataset(self.test_datasets)
-            self._test_setup()
+        # if stage in (None, 'test', 'predict'):
+        #     self.test_datasets = [
+        #         TextDataset(
+        #             data_config['subsets']['test'],
+        #             Define.DATAPARSERS[data_config["name"]],
+        #             data_config
+        #         ) for data_config in self.data_configs if 'test' in data_config['subsets']
+        #     ]
+        #     self.test_dataset = ConcatDataset(self.test_datasets)
+        #     self._test_setup()
 
     def _train_setup(self):
         self.batch_size = self.train_config["optimizer"]["batch_size"]
@@ -102,12 +102,12 @@ class SSLPRDataModule(pl.LightningDataModule):
         )
         return self.val_loader
 
-    def test_dataloader(self):
-        """Test dataloader"""
-        self.test_loader = DataLoader(
-            self.test_dataset,
-            batch_size=self.batch_size//torch.cuda.device_count(),
-            shuffle=False,
-            collate_fn=self.collate2.collate_fn(False, re_id=False),
-        )
-        return self.test_loader
+    # def test_dataloader(self):
+    #     """Test dataloader"""
+    #     self.test_loader = DataLoader(
+    #         self.test_dataset,
+    #         batch_size=self.batch_size//torch.cuda.device_count(),
+    #         shuffle=False,
+    #         collate_fn=self.collate2.collate_fn(False, re_id=False),
+    #     )
+    #     return self.test_loader

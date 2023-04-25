@@ -24,7 +24,7 @@ class TextEncoder(nn.Module):
         return self
 
     def forward(self, x, lengths, mask=None):
-        final_mask = get_mask_from_lengths(lengths).to(self.device)
+        final_mask = get_mask_from_lengths(lengths).to(x.device)
         if mask is not None:
             final_mask = torch.logical_or(final_mask, mask)
             # Avoid to pass full mask into transformer, which will cause NaN gradient.

@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from collections import OrderedDict
 from typing import Type
+import random
 
 from lightning.build import build_all_speakers, build_id2symbols
 from lightning.systems import System
@@ -87,18 +88,18 @@ class SemiSystem(System):
    
     def common_step(self, batch, batch_idx, train=True):
         _, ref_info = batch
-        seg_repr, _ = self.fscl.build_segmental_representation([ref_info])
+        seg_repr = self.fscl.build_segmental_representation([ref_info])
         t2r_loss_dict, t2r_output = self.common_t2r_step(batch, batch_idx, train)  # be careful that seg_repr collapse
 
         if self.use_matching:  # Close the gap of distributions by restricting domain
-            seg_repr = self.repr_matching(seg_repr)
-            t2r_output = self.text_matching(t2r_output)
+            seg_repr, _ = self.repr_matching(seg_repr)
+            t2r_output, _ = self.text_matching(t2r_output)
 
         if not train:
             u2s_loss_dict, u2s_output = self.common_r2s_step(t2r_output, batch, batch_idx, train)
         else:  # here we use pure switch strategy instead of mixing
             B, L, dim = seg_repr.shape
-            mask = torch.zeros((B, L)) if torch.rand() < 0.5 else torch.ones((B, L))
+            mask = torch.zeros((B, L), dtype=torch.bool) if random.uniform(0, 1) < 0.5 else torch.ones((B, L), dtype=torch.bool)
             mixed_repr = torch.where(mask.to(self.device).unsqueeze(-1), seg_repr, t2r_output)
             u2s_loss_dict, u2s_output = self.common_r2s_step(mixed_repr, batch, batch_idx, train)
 
@@ -109,6 +110,15 @@ class SemiSystem(System):
 
         loss_dict["Total Loss"] = u2s_loss_dict["Total Loss"]
         return loss_dict, u2s_output
+
+    def synth_step(self, batch, batch_idx):
+        labels, _ = batch
+        emb_texts = self.embedding_model(labels[3])
+        emb_texts = self.text_encoder(emb_texts, lengths=labels[4])
+        if self.use_matching:
+            emb_texts, _ = self.text_matching(emb_texts)
+        output = self.model(labels[2], emb_texts, *(labels[4:6]), lang_args=labels[-1], average_spk_emb=True)
+        return output
 
     def on_train_batch_start(self, batch, batch_idx, dataloader_idx):
         assert len(batch[0]) == 13, f"data with 13 elements, but get {len(batch)}"
@@ -126,6 +136,7 @@ class SemiSystem(System):
     
     def validation_step(self, batch, batch_idx):
         val_loss_dict, predictions = self.common_step(batch, batch_idx, train=False)
+        synth_predictions = self.synth_step(batch, batch_idx)
         
         if batch_idx == 0:
             layer_weights = self.fscl.get_hook("layer_weights")
@@ -134,7 +145,7 @@ class SemiSystem(System):
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
-        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch[0]}
+        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch[0], 'synth': synth_predictions}
 
     def on_save_checkpoint(self, checkpoint):
         checkpoint = self.fscl.on_save_checkpoint(checkpoint, prefix="fscl")

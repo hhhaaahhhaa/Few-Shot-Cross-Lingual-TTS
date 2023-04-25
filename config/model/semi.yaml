@@ -1,5 +1,6 @@
 fscl:
   codebook_size: 128
+  dim: 256
   nhead: 4
   downstream:
     transformer:

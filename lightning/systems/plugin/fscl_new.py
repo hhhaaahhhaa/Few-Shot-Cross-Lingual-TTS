@@ -27,7 +27,7 @@ class SemiFSCLPlugIn(FSCLPlugIn, Hookable):
         self._custom_hooks = {}
 
     def _build_model(self):
-        if self.upstream == "mel":
+        if Define.UPSTREAM == "mel":
             self.upstream = Padding()
             self.featurizer = None
             upstream_dim = AUDIO_CONFIG["mel"]["n_mel_channels"]
@@ -52,7 +52,7 @@ class SemiFSCLPlugIn(FSCLPlugIn, Hookable):
         self.phoneme_query_extractor = PhonemeQueryExtractor(mode="average", two_stage=True)
         self.codebook_attention = SoftMultiAttCodebook(
             codebook_size=self.model_config["codebook_size"],
-            embed_dim=self.model_config["transformer"]["encoder_hidden"],
+            embed_dim=self.model_config["dim"],
             num_heads=self.model_config["nhead"],
         )
         self.checkpoint_remove_list = ["upstream"]
@@ -71,14 +71,14 @@ class SemiFSCLPlugIn(FSCLPlugIn, Hookable):
                 repr = ssl_match_length(repr, info["max_len"].item())
                 repr = repr.detach()
             if self.featurizer is not None:
-                repr = self.featurizer(repr)
+                repr = self.featurizer(repr, dim=2)
             repr1 = self.downstream1(repr, info["lens"].cpu())
             repr2 = self.downstream2(repr1, info["lens"].cpu())
             hiddens1.extend([x1 for x1 in repr1])
             hiddens2.extend([x2 for x2 in repr2])
         return hiddens1, hiddens2
 
-    def build_segmental_representation(self, ref_infos, return_attn=False):
+    def build_segmental_representation(self, ref_infos):
         avg_frames_list = []
         for info in ref_infos:
             avg_frames_list.extend(info["avg_frames"])
