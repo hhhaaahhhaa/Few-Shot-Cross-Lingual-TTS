@@ -3,7 +3,7 @@ import numpy as np
 import json
 
 
-LOCAL = False
+LOCAL = True
 USE_OLD_CONFIG = False
 DEBUG = False
 CUDA_LAUNCH_BLOCKING = False
