@@ -99,4 +99,4 @@ class LibriTTSPreprocessor(BasePreprocessor):
         output_dir = os.path.dirname(cleaned_data_info_path)
         with open(cleaned_data_info_path, 'r', encoding='utf-8') as f:
             queries = json.load(f)
-        template.split_multispeaker_dataset(self.data_parser, queries, output_dir, val_spk_size=40)
+        template.split_multispeaker_dataset(self.data_parser, queries, output_dir, val_spk_size=10)

@@ -88,6 +88,7 @@ def clean(root: str, output_path: str):
     for query in tqdm(res):
         if checker.check(query):
             filtered.append(query)
+    print(f"{len(res)} => {len(filtered)}")
     res = filtered
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(res, f, indent=4)
@@ -98,6 +99,7 @@ def clean(root: str, output_path: str):
     for query in tqdm(res):
         if checker.check(query):
             filtered.append(query)
+    print(f"{len(res)} => {len(filtered)}")
     res = filtered
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(res, f, indent=4)
@@ -108,6 +110,7 @@ def clean(root: str, output_path: str):
     for query in tqdm(res):
         if checker.check(query):
             filtered.append(query)
+    print(f"{len(res)} => {len(filtered)}")
     res = filtered
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(res, f, indent=4)
@@ -130,11 +133,11 @@ def clean(root: str, output_path: str):
 
 
 if __name__ == "__main__":
-    # clean("./preprocessed_data/LibriTTS", "_data/LibriTTS/clean.json")
-    # clean("./preprocessed_data/AISHELL-3", "_data/AISHELL-3/clean.json")
+    clean("./preprocessed_data/LibriTTS", "_data/LibriTTS/clean.json")
+    clean("./preprocessed_data/AISHELL-3", "_data/AISHELL-3/clean.json")
     clean("./preprocessed_data/kss", "_data/kss/clean.json")
-    # clean("./preprocessed_data/JSUT", "_data/JSUT/clean.json")
+    clean("./preprocessed_data/JSUT", "_data/JSUT/clean.json")
     clean("./preprocessed_data/CSS10/german", "_data/CSS10/german/clean.json")
-    # clean("./preprocessed_data/LJSpeech", "_data/LJSpeech/clean.json")
+    clean("./preprocessed_data/LJSpeech", "_data/LJSpeech/clean.json")
     clean("./preprocessed_data/CSS10/french", "_data/CSS10/french/clean.json")
     clean("./preprocessed_data/CSS10/spanish", "_data/CSS10/spanish/clean.json")
