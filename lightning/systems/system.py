@@ -123,6 +123,7 @@ class System(pl.LightningModule):
             state_dict.pop(k)
         for k in model_state_dict:
             if k not in state_dict:
+                print("Reinitialize: ", k)
                 state_dict[k] = model_state_dict[k]
 
         if is_changed:

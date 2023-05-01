@@ -34,6 +34,11 @@ class Saver(BaseSaver):
         self.visualizer = AttentionVisualizer()
         self.data_configs = data_configs
         self.id2symbols = build_id2symbols(self.data_configs)
+        increment = 0
+        self.re_id_increment = {}
+        for k, v in self.id2symbols.items():
+            self.re_id_increment[k] = increment
+            increment += len(v)
         
         self.model_config = model_config
         self.sr = AUDIO_CONFIG["audio"]["sampling_rate"]
@@ -43,6 +48,8 @@ class Saver(BaseSaver):
 
         vocoder_cls = get_vocoder(self.model_config["vocoder"]["model"])
         self.vocoder = vocoder_cls().cuda()
+
+        self.recover_text = True
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         loss = outputs['losses']
@@ -59,7 +66,25 @@ class Saver(BaseSaver):
         # Synthesis one sample and log to CometLogger
         if Define.USE_COMET:
             if step % pl_module.train_config["step"]["synth_step"] == 0 and pl_module.local_rank == 0:
-                metadata = {'ids': batch[0]}
+                metadata = {
+                    'ids': _batch[0],
+                    'raw_text': _batch[1][0],
+                    'language': LANG_ID2NAME[int(_batch[-1][0].item())]
+                }
+
+                # Recover text
+                if self.recover_text:
+                    text = []
+                    lang_name = metadata["language"]
+                    for x in _batch[3][0]:
+                        if x != 0:
+                            phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                            text.append(phn)
+                        else:
+                            break
+                    text = " ".join(text)
+                    metadata["text"] = text
+
                 fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
                     _batch, output, self.vocoder, self.model_config
                 )
@@ -114,7 +139,25 @@ class Saver(BaseSaver):
         # Log figure/audio to logger + save audio
         # One smaple for the first two batches, so synthesize two samples in total.
         if batch_idx < 2 and pl_module.local_rank == 0:
-            metadata = {'ids': batch[0]}
+            metadata = {
+                'ids': _batch[0],
+                'raw_text': _batch[1][0],
+                'language': LANG_ID2NAME[int(_batch[-1][0].item())]
+            }
+
+            # Recover text
+            if self.recover_text:
+                text = []
+                lang_name = metadata["language"]
+                for x in _batch[3][0]:
+                    if x != 0:
+                        phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                        text.append(phn)
+                    else:
+                        break
+                text = " ".join(text)
+                metadata["text"] = text
+
             fig, wav_reconstruction, wav_prediction, basename = synth_one_sample_with_target(
                 _batch, output, self.vocoder, self.model_config
             )

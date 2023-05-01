@@ -10,7 +10,7 @@ fscl:
       dim_feedforward: [256, 256]
       dropout: 0.2
 
-use_matching: True
+use_matching: False
 matching:
   codebook_size: 128
   dim: 256
@@ -27,7 +27,7 @@ text_encoder:
   max_seq_len: 1500
   
 transformer:
-  encoder_layer: 4
+  encoder_layer: 2
   encoder_head: 2
   encoder_hidden: 256
   decoder_layer: 6

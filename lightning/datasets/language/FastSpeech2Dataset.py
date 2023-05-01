@@ -1,6 +1,7 @@
 import numpy as np
 from torch.utils.data import Dataset
 import random
+import math
 
 from dlhlp_lib.utils.numeric import numpy_exist_nan
 
@@ -42,7 +43,7 @@ class FastSpeech2Dataset(Dataset):
         
         duration = self.data_parser.mfa_duration.read_from_query(query)
         mel = self.data_parser.mel.read_from_query(query)
-        mel = np.transpose(mel[:, :sum(duration)])
+        mel = np.transpose(mel[:, :sum(duration)]) * math.log(10)
         if self.config["pitch"]["feature"] == "phoneme_level":
             pitch = self.data_parser.mfa_duration_avg_pitch.read_from_query(query)
         else:

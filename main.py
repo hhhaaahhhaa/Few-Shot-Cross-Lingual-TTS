@@ -48,24 +48,21 @@ def main(args, configs):
             "limit_val_batches": 50,  # Useful for debugging
         })
 
-    preprocess_configs, model_config, train_config, algorithm_config = configs
+    data_configs, model_config, train_config, algorithm_config = configs
 
-    #====== Parsing original format to general format ======
-    # TODO: Tune and training currently are using different config format.
-    data_configs = []
-    if Define.USE_OLD_CONFIG:
-        for prep in preprocess_configs:
-            parse_prep = {
-                "name": prep["dataset"],
-                "lang_id": prep["lang_id"],
-                "unit_name": prep.get("unit_name", ""),
-                "data_dir": prep["path"]["preprocessed_path"], 
-                "subsets": prep["subsets"],
-                "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
-            }
-            data_configs.append(parse_prep)
-    else:
-        data_configs = preprocess_configs
+    #====== Parsing original format to general format (Deprecated) ======
+    # data_configs = []
+    # if Define.USE_OLD_CONFIG:
+    #     for prep in preprocess_configs:
+    #         parse_prep = {
+    #             "name": prep["dataset"],
+    #             "lang_id": prep["lang_id"],
+    #             "unit_name": prep.get("unit_name", ""),
+    #             "data_dir": prep["path"]["preprocessed_path"], 
+    #             "subsets": prep["subsets"],
+    #             "text_cleaners": prep["preprocessing"]["text"]["text_cleaners"], 
+    #         }
+    #         data_configs.append(parse_prep)
 
     # register parsers
     build_data_parsers(data_configs)
@@ -172,8 +169,8 @@ def main(args, configs):
     tune_flag = args.tune
     if tune_flag:
         reference_data_configs = [data_configs[0]]
-        if len(data_configs) > 1:  # if multiple configs then separate the first config to be reference
-            data_configs = data_configs[1:]
+        # if len(data_configs) > 1:  # if multiple configs then separate the first config to be reference
+        #     data_configs = data_configs[1:]
     datamodule = get_datamodule(algorithm_config["type"])(
         data_configs, model_config, train_config, algorithm_config, log_dir, result_dir
     )
@@ -327,6 +324,7 @@ if __name__ == "__main__":
     parser.add_argument("--nolid", action="store_true", default=False)
     parser.add_argument("--tunet2u", action="store_true", default=False)
     parser.add_argument("--atttemp", action="store_true", default=False)
+    parser.add_argument("--conf", type=float, default=0.0)
 
     args = parser.parse_args()
     Define.DEBUG = args.debug
@@ -334,6 +332,7 @@ if __name__ == "__main__":
     Define.NOLID = args.nolid
     Define.TUNET2U = args.tunet2u
     Define.ATTTEMP = args.atttemp
+    Define.PL_CONF = args.conf
 
     Define.USE_COMET = args.use_comet
     Define.LAYER_IDX = args.layer_exp

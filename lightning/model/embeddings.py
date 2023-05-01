@@ -16,16 +16,17 @@ class MultilingualEmbedding(nn.Module):
         for symbol_id, v in id2symbols.items():
             if len(v) > 0:
                 w_init = torch.randn(len(v), dim)
-                std = sqrt(2.0 / (len(v) + dim))
-                val = sqrt(3.0) * std  # uniform bounds for std
-                w_init.uniform_(-val, val)
+                # std = sqrt(2.0 / (len(v) + dim))
+                # val = sqrt(3.0) * std  # uniform bounds for std
+                # w_init.uniform_(-val, val)
                 w_init[padding_idx].fill_(0)
                 self.tables[f"table-{symbol_id}"] = nn.Parameter(w_init)
+        print(self.id2symbols.keys())
 
     def forward(self, x, symbol_id: Optional[str]=None):
         if symbol_id is None:
             # for k, p in self.tables.items():
             #     print(k, p.shape)
-            concat_tables = torch.cat([p for p in self.tables.values()], dim=0)
+            concat_tables = torch.cat([self.tables[f"table-{p}"] for p in self.id2symbols.keys()], dim=0)
             return F.embedding(x, concat_tables, padding_idx=self.padding_idx)
         return F.embedding(x, self.tables[f"table-{symbol_id}"], padding_idx=self.padding_idx)

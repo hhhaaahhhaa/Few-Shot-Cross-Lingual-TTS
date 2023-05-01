@@ -2,6 +2,7 @@ from . import language
 from . import phoneme_recognition
 from . import t2u
 from . import boundary_detection
+from . import semi
 
 
 DATA_MODULE = {
@@ -64,6 +65,8 @@ DATA_MODULE = {
 
     "semi-baseline": language.FastSpeech2DataModule,
     "semi": language.UnitDataModule,
+    "semi-baseline-tune": semi.FastSpeech2DataModule,
+    # "semi-tune": semi.UnitDataModule,
 }
 
 def get_datamodule(algorithm):

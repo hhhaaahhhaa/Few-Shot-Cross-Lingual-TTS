@@ -24,6 +24,7 @@ class LanguageCollate(object):
         # calculate speaker map
         speakers = build_all_speakers(data_configs)
         self.speaker_map = {spk: i for i, spk in enumerate(speakers)}
+        print(self.re_id_increment)
 
     def collate_fn(self, sort=False, re_id=True):
         return partial(self._collate_fn, sort=sort, re_id=re_id)

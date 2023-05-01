@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import math
 
 
 class FastSpeech2Loss(nn.Module):
@@ -12,7 +13,7 @@ class FastSpeech2Loss(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
 
-    def forward(self, inputs, predictions):
+    def forward(self, inputs, predictions, weights=None):
         (
             mel_targets,
             _,
@@ -43,6 +44,21 @@ class FastSpeech2Loss(nn.Module):
         pitch_targets.requires_grad = False
         energy_targets.requires_grad = False
         mel_targets.requires_grad = False
+
+        # Weighted loss
+        if weights is not None:
+            weights.requires_grad = False
+            weights = weights.unsqueeze(-1)
+            weights_sqrt = torch.sqrt(weights)
+            pitch_predictions = pitch_predictions * weights_sqrt
+            pitch_targets = pitch_targets * weights_sqrt
+            energy_predictions = energy_predictions * weights_sqrt
+            energy_targets = energy_targets * weights_sqrt
+            log_duration_predictions = log_duration_predictions * weights_sqrt
+            log_duration_targets = log_duration_targets * weights_sqrt
+            mel_predictions = mel_predictions * weights
+            postnet_mel_predictions = postnet_mel_predictions * weights
+            mel_targets = mel_targets * weights
 
         if self.pitch_feature_level == "phoneme_level":
             pitch_predictions = pitch_predictions.masked_select(src_masks)

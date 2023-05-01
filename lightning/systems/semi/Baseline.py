@@ -94,7 +94,7 @@ class BaselineSystem(System):
 
     def validation_step(self, batch, batch_idx):
         val_loss_dict, predictions = self.common_step(batch, batch_idx, train=False)
-        synth_predictions = self.synth_step(batch, batch_idx)
+        synth_predictions = self.synth_step(batch, batch_idx) if self.global_step > 0 else None
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
