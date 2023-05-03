@@ -1,1 +1,1 @@
-from .FastSpeech2Dataset import UnitPseudoDataset
+from .FastSpeech2Dataset import UnitPseudoDataset, UnitPseudoScoreDataset

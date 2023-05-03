@@ -5,6 +5,8 @@ from collections import OrderedDict
 from typing import Type
 import random
 
+from dlhlp_lib.utils.tool import get_mask_from_lengths
+
 from lightning.build import build_all_speakers, build_id2symbols
 from lightning.systems import System
 from lightning.model import FastSpeech2Loss, FastSpeech2
@@ -87,7 +89,7 @@ class SemiSystem(System):
         return loss_dict, output
    
     def common_step(self, batch, batch_idx, train=True):
-        _, ref_info = batch
+        labels, ref_info = batch
         seg_repr = self.fscl.build_segmental_representation([ref_info])
         t2r_loss_dict, t2r_output = self.common_t2r_step(batch, batch_idx, train)  # be careful that seg_repr collapse
 
@@ -100,7 +102,7 @@ class SemiSystem(System):
         else:  # here we use pure switch strategy instead of mixing
             B, L, dim = seg_repr.shape
             mask = torch.zeros((B, L), dtype=torch.bool) if random.uniform(0, 1) < 0.5 else torch.ones((B, L), dtype=torch.bool)
-            mixed_repr = torch.where(mask.to(self.device).unsqueeze(-1), seg_repr, t2r_output)
+            mixed_repr = torch.where(mask.to(self.device).unsqueeze(-1), t2r_output, seg_repr)
             u2s_loss_dict, u2s_output = self.common_r2s_step(mixed_repr, batch, batch_idx, train)
 
         loss_dict = flat_merge_dict({
@@ -109,6 +111,12 @@ class SemiSystem(System):
         })
 
         loss_dict["Total Loss"] = u2s_loss_dict["Total Loss"]
+
+        # Calculate unsup ratio
+        length_mask = get_mask_from_lengths(labels[4])
+        unsup_ratio = torch.logical_and(~length_mask, mask).sum() / ~length_mask.sum()
+        self.log("Unsup ratio", unsup_ratio, sync_dist=True)
+        
         return loss_dict, u2s_output
 
     def synth_step(self, batch, batch_idx):

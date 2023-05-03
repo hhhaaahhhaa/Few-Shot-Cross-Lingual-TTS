@@ -85,7 +85,7 @@ SYSTEM_SEMI = {
     "semi": semi.SemiSystem,
 
     "semi-baseline-tune": semi.BaselineTuneSystem,
-    # "semi-tune": semi.BaselineTuneSystem,
+    "semi-tune": semi.SemiTuneSystem,
 }
 
 

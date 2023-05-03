@@ -54,7 +54,8 @@ class BaselineTuneSystem(BaselineSystem, Tunable):
         checkpoint = ModelCheckpoint(
             dirpath=self.ckpt_dir,
             monitor="Val/Total Loss", mode="min",
-            every_n_train_steps=save_step, save_top_k=1
+            every_n_train_steps=save_step, save_top_k=1,
+            filename='best'
         )
 
         # Early stopping

@@ -6,8 +6,6 @@ from . import semi
 
 
 DATA_MODULE = {
-    # "semi-fscl": language.SemiFSCLDataModule,
-    # "semi-fscl-tune": language.SemiFSCLTuneDataModule,
     "baseline": language.FastSpeech2DataModule,
     "fscl": language.FSCLDataModule,
     "fscl-orig": language.FSCLDataModule,
@@ -66,7 +64,7 @@ DATA_MODULE = {
     "semi-baseline": language.FastSpeech2DataModule,
     "semi": language.UnitDataModule,
     "semi-baseline-tune": semi.FastSpeech2DataModule,
-    # "semi-tune": semi.UnitDataModule,
+    "semi-tune": semi.UnitDataModule,
 }
 
 def get_datamodule(algorithm):

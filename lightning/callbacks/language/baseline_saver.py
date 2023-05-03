@@ -165,7 +165,7 @@ class Saver(BaseSaver):
                 self.log_figure(logger, "Validation", step, basename, "", fig)
                 self.log_audio(logger, "Validation", step, basename, "reconstructed", wav_reconstruction, self.sr, metadata)
                 self.log_audio(logger, "Validation", step, basename, "synthesized", wav_prediction, self.sr, metadata)
-                plt.close(fig)
+            plt.close(fig)
 
             if synth_output is not None:
                 synth_samples(_batch, synth_output, self.vocoder, self.model_config, figure_dir, audio_dir, f"FTstep_{step}")
