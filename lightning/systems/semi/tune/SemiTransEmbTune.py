@@ -6,20 +6,32 @@ import torch.nn.functional as F
 from dlhlp_lib.utils.tool import get_mask_from_lengths
 
 import Define
+from lightning.utils.tool import flat_merge_dict, generate_reference_info
 from lightning.systems.interface import Tunable
 from .filter import BaselineFilter, FramewiseFilter
-from lightning.utils.tool import flat_merge_dict
 from ..Semi import SemiSystem
 
 
-class SemiTuneSystem(SemiSystem, Tunable):
+class SemiTransEmbTuneSystem(SemiSystem, Tunable):  # SemiSystem already consist of SemiFSCLPlugin
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pl_filter = FramewiseFilter(threshold=Define.PL_CONF)
     
     def tune_init(self, data_configs) -> None:
-        self.target_lang_id = data_configs[0]["lang_id"]
+        print("Generate reference...")
+        ref_infos = generate_reference_info(data_configs[0])
+        self.target_lang_id = ref_infos[0]["lang_id"]
         print(f"Target Language: {self.target_lang_id}.")
+
+        print("Embedding initialization...")
+        self.cuda()
+        with torch.no_grad():
+            table, attn = self.fscl.build_embedding_table(ref_infos, return_attn=True)
+            self.attn = attn
+            self.embedding_model.tables[f"table-{ref_infos[0]['symbol_id']}"].copy_(table)
+        for p in self.embedding_model.parameters():
+            p.requires_grad = True
+        self.cpu()
 
     def build_optimized_model(self):
         opt_modules = [self.text_encoder, self.model, self.embedding_model]
@@ -66,11 +78,25 @@ class SemiTuneSystem(SemiSystem, Tunable):
 
         # Calculate unsup ratio
         length_mask = get_mask_from_lengths(labels[4])
-        pl_ratio = torch.logical_and(~length_mask, ~mask).sum() / (~length_mask).sum()
-        self.log("PL ratio", pl_ratio.item(), sync_dist=True, batch_size=self.bs)
+        unsup_ratio = torch.logical_and(~length_mask, ~mask).sum() / (~length_mask).sum()
+        self.log("Unsup ratio", unsup_ratio.item(), sync_dist=True, batch_size=self.bs)
 
         return loss_dict, u2s_output
     
+    def validation_step(self, batch, batch_idx):
+        val_loss_dict, predictions = self.common_step(batch, batch_idx, train=False)
+        synth_predictions = self.synth_step(batch, batch_idx)
+        
+        if batch_idx == 0:
+            layer_weights = self.fscl.get_hook("layer_weights")
+            self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
+            self.saver.log_codebook_attention(self.logger, self.attn, batch[-1][0].item(), batch_idx, self.global_step + 1, "val")
+
+        # Log metrics to CometLogger
+        loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
+        self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
+        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch, 'synth': synth_predictions}
+
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         self.test_global_step = checkpoint["global_step"]
         state_dict = checkpoint["state_dict"]

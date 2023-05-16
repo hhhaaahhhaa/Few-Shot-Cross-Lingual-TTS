@@ -83,9 +83,11 @@ SYSTEM_BD = {
 SYSTEM_SEMI = {
     "semi-baseline": semi.BaselineSystem,
     "semi": semi.SemiSystem,
+    "semi-fscl": semi.SemiTransEmbSystem,
 
     "semi-baseline-tune": semi.BaselineTuneSystem,
     "semi-tune": semi.SemiTuneSystem,
+    "semi-fscl-tune": semi.SemiTransEmbTuneSystem,
 }
 
 

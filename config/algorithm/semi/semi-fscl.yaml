@@ -1,0 +1,21 @@
+name: semi-fscl
+type: semi-fscl
+
+adapt:
+  type: lang # spk/lang
+  class: MAML # MAML/iMAML
+
+  task: &task
+    ways: 1
+    shots: 32
+    queries: 8
+    lr: 0.001
+
+  train:
+    << : *task
+    steps: 0
+    meta_batch_size: 1
+
+  test:
+    << : *task
+    steps: 20000 # max adaptation steps for testing

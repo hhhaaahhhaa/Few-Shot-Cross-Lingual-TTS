@@ -50,6 +50,7 @@ class Saver(BaseSaver):
         self.vocoder = vocoder_cls().cuda()
 
         self.recover_text = True
+        self.re_id = True
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
         loss = outputs['losses']
@@ -78,7 +79,10 @@ class Saver(BaseSaver):
                     lang_name = metadata["language"]
                     for x in _batch[3][0]:
                         if x != 0:
-                            phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                            if self.re_id:
+                                phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                            else:
+                                phn = self.id2symbols[lang_name][int(x)]
                             text.append(phn)
                         else:
                             break
@@ -151,7 +155,10 @@ class Saver(BaseSaver):
                 lang_name = metadata["language"]
                 for x in _batch[3][0]:
                     if x != 0:
-                        phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                        if self.re_id:
+                            phn = self.id2symbols[lang_name][int(x - self.re_id_increment[lang_name])]
+                        else:
+                            phn = self.id2symbols[lang_name][int(x)]
                         text.append(phn)
                     else:
                         break

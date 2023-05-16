@@ -63,8 +63,10 @@ DATA_MODULE = {
 
     "semi-baseline": language.FastSpeech2DataModule,
     "semi": language.UnitDataModule,
+    "semi-fscl": language.FSCLDataModule,
     "semi-baseline-tune": semi.FastSpeech2DataModule,
     "semi-tune": semi.UnitDataModule,
+    "semi-fscl-tune": semi.UnitDataModule,
 }
 
 def get_datamodule(algorithm):

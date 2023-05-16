@@ -40,10 +40,10 @@ class FSCLDataModule(pl.LightningDataModule):
 
         self.meta_batch_size = self.algorithm_config["adapt"]["train"]["meta_batch_size"]
 
-        self.return_qry_info = False  # Only true when ssl ada
+        self.return_qry_info = True  # Only true when ssl ada, semi fscl
 
     def setup(self, stage=None):
-        spk_refer_wav = (self.algorithm_config["adapt"]["speaker_emb"]
+        spk_refer_wav = (self.model_config["speaker_emb"]
                      in ["dvec", "encoder", "scratch_encoder"])
 
         if stage in (None, 'fit', 'validate'):

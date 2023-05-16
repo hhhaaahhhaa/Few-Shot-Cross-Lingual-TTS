@@ -85,6 +85,9 @@ class FSCLCollate(object):
             if query_info:
                 qry_info = {}
                 qry_info["raw_feat"] = [torch.from_numpy(data[idx]["raw-feat"]).float() for idx in qry_ids]
+                qry_info["avg_frames"] = [data[idx]["avg-frames"] for idx in qry_ids]
+                qry_info["lens"] = torch.LongTensor([sum(data[idx]["avg-frames"]) for idx in qry_ids])
+                qry_info["max_len"] = max(qry_info["lens"])
                 return (sup_out, qry_out, sup_info, qry_info)
         # calc_ref = time.time() - st1
 
