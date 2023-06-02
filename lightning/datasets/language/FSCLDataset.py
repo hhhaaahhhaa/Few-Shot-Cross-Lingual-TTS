@@ -311,6 +311,9 @@ class UnitFSCLDataset(Dataset):
                 assert sum(duration) == len(pitch)
         except:
             print("Length mismatch: ", query)
+            pp = self.unit_parser.phoneme.read_from_query(query)
+            print(pp)
+            print(len(pp.strip().split(" ")))
             print(len(text), len(phonemes), len(duration), len(pitch), len(energy))
             raise
 

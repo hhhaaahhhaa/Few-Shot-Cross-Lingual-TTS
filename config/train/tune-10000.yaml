@@ -1,7 +1,7 @@
 scheduler_type: sqrt
 optimizer:
   lr: 0.001
-  batch_size: 16
+  batch_size: 4
   betas: [0.9, 0.98]
   eps: 0.000000001
   weight_decay: 0.0
