@@ -52,12 +52,12 @@ class SemiTransEmbTuneSystem(SemiSystem, Tunable):  # SemiSystem already consist
         labels, ref_info = batch
         with torch.no_grad():
             seg_repr = self.fscl.build_segmental_representation([ref_info])
-            mask = self.pl_filter.mask_gen(ref_info["phoneme_score"], lengths=labels[4]).to(self.device)
+            mask = self.pl_filter.mask_gen(ref_info["phoneme_score"], lengths=labels[4], durations=labels[-2]).to(self.device)
 
         if not train:
             t2r_loss_dict, t2r_output = self.common_t2r_step(batch, batch_idx, train, mask=None)  # be careful that seg_repr collapse
         else:
-            t2r_loss_dict, t2r_output = self.common_t2r_step(batch, batch_idx, train, mask=mask)
+            t2r_loss_dict, t2r_output = self.common_t2r_step(batch, batch_idx, train)
 
         if self.use_matching:  # Close the gap of distributions by restricting domain
             seg_repr, _ = self.repr_matching(seg_repr)
@@ -90,12 +90,12 @@ class SemiTransEmbTuneSystem(SemiSystem, Tunable):  # SemiSystem already consist
         if batch_idx == 0:
             layer_weights = self.fscl.get_hook("layer_weights")
             self.saver.log_layer_weights(self.logger, layer_weights.data, self.global_step + 1, "val")
-            self.saver.log_codebook_attention(self.logger, self.attn, batch[-1][0].item(), batch_idx, self.global_step + 1, "val")
+            self.saver.log_codebook_attention(self.logger, self.attn, batch[0][-1][0].item(), batch_idx, self.global_step + 1, "val")
 
         # Log metrics to CometLogger
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
-        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch, 'synth': synth_predictions}
+        return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'output': predictions, '_batch': batch[0], 'synth': synth_predictions}
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         self.test_global_step = checkpoint["global_step"]
